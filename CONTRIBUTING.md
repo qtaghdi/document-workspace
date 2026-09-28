@@ -94,8 +94,9 @@ make audit
 - Call out XLSX compatibility, revision, security, and MCP contract impact.
 - Update `CHANGELOG.md` for material changes.
 - Update architecture documents when a system boundary changes.
-- Commit generated files under `internal/httpapi/static` with their source
-  changes under `web`.
+- Do not commit generated files under `internal/httpapi/static/assets`.
+- Use `make build` for release binaries so the frontend is generated before the
+  Go binary embeds it.
 - Keep unrelated cleanup out of the pull request.
 
 ## Documentation and Text

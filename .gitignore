@@ -1,6 +1,7 @@
 # Frontend dependencies and local caches
 web/node_modules/
 web/.vite/
+internal/httpapi/static/assets/
 
 # Local configuration and secrets
 .env

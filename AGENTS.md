@@ -40,9 +40,10 @@ The server owns authoritative workbook data. UI state such as focus, selection,
 open panels, and in-progress animation remains ephemeral in the browser.
 
 This repository is a polyglot monorepo. Keep the Go service, TypeScript UI,
-generated embedded assets, tests, and architecture documents versioned and
-verified together. Do not split them into separate repositories without a
-deployment or ownership requirement.
+tests, and architecture documents versioned and verified together. Vite output
+under `internal/httpapi/static/assets` is generated locally and is not tracked.
+Do not split the source into separate repositories without a deployment or
+ownership requirement.
 
 Read [`docs/architecture.md`](docs/architecture.md) before changing a system
 boundary or adding infrastructure.
@@ -241,8 +242,8 @@ and expected outputs.
   period.
 - Use the repository issue and pull request templates. Pull request titles must
   follow the same Conventional Commits format.
-- Make focused commits and keep generated frontend assets in the same commit as
-  their source changes.
+- Make focused commits. Do not commit generated frontend assets under
+  `internal/httpapi/static/assets`.
 - Do not combine unrelated formatting or cleanup with a feature change.
 - Do not rewrite shared history unless the repository owner explicitly asks.
 - Update documentation and the changelog in the same commit as the behavior.

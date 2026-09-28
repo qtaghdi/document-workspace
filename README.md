@@ -70,7 +70,9 @@ make build
 
 The browser application uses plain TypeScript, Univer, Vite, and Tailwind CSS.
 The production build is written to `internal/httpapi/static` and embedded in the
-Go binary. React is not required.
+Go binary. Generated files under `internal/httpapi/static/assets` are ignored by
+Git. Use `make build`, rather than a standalone `go build`, when producing a
+release binary. React is not required.
 
 Run a workbook locally:
 

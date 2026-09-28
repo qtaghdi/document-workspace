@@ -24,6 +24,7 @@ and this project intends to follow Semantic Versioning when releases begin.
   development workflows.
 - Added an OSS-only dependency guard that rejects Univer Pro packages.
 - Added contribution rules and GitHub templates for issues and pull requests.
+- Ignored generated Vite assets while retaining the embedded Go build flow.
 - Added a Go service foundation using the official MCP Go SDK and Excelize.
 - Added `get_workbook`, `read_range`, and `apply_operations` MCP tools.
 - Added revision-based conflict detection for workbook writes.

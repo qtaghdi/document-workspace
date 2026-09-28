@@ -15,7 +15,7 @@ import (
 	"github.com/qtaghdi/xlsx-viewer/internal/workbook"
 )
 
-//go:embed static/index.html static/assets/*
+//go:embed static
 var staticFS embed.FS
 
 type Server struct {
