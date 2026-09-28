@@ -48,8 +48,10 @@ boundary or adding infrastructure.
 - Official MCP Go SDK for MCP transports and tool contracts.
 - Excelize for XLSX package access.
 - `net/http` for the current HTTP API and SSE transport.
-- TypeScript and React with Vite for the production spreadsheet UI. The current
-  embedded HTML is an intentionally temporary vertical slice.
+- TypeScript with Univer for the spreadsheet surface. Keep Univer behind the
+  repository's `SpreadsheetEngine` boundary.
+- Vite for browser bundling and Tailwind CSS for application shell styling.
+  React is not required by the application architecture.
 - SSE for server-to-UI edit events. Add WebSocket only when bidirectional
   presence or latency requirements justify the operational cost.
 - A relational database for identities, workbook metadata, and revision
@@ -65,6 +67,7 @@ a concrete requirement and a short architecture note.
 - `cmd/xlsx-viewer`: executable entry point.
 - `internal/workbook`: workbook domain and persistence.
 - `internal/httpapi`: HTTP, SSE, browser UI, and MCP adapters.
+- `web`: TypeScript spreadsheet UI and engine adapters.
 - `docs`: English Markdown architecture and product documents.
 - `server.py`, `test_server.py`: preserved Python MVP and regression reference.
 
@@ -141,7 +144,9 @@ Publish animation intent, then commit at cell or batch granularity.
 
 ## Frontend Conventions
 
-- The production UI should use TypeScript and React with Vite.
+- Use TypeScript and keep editor-specific calls behind `SpreadsheetEngine`.
+- Use Tailwind CSS utilities for application-owned styling. Do not grow a
+  monolithic handwritten stylesheet.
 - Keep the grid virtualized. Never render an entire large worksheet at once.
 - Keyboard navigation, range selection, copy and paste, undo, and accessible
   focus states are core behavior.
@@ -150,6 +155,8 @@ Publish animation intent, then commit at cell or batch granularity.
 - Respect `prefers-reduced-motion` for AI cursor and typing animations.
 - Do not fake successful persistence. Show pending, committed, conflicted, and
   failed states distinctly.
+- Keep all Univer packages on the same version and audit production
+  dependencies after an upgrade.
 - Test current desktop, a small laptop viewport, and a mobile fallback.
 
 ## Comments and Documentation
@@ -230,4 +237,3 @@ A change is complete only when:
 - Repository documentation is still accurate.
 - No temporary HTML reports or QA artifacts are staged.
 - New text contains no em dash characters.
-

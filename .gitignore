@@ -1,7 +1,35 @@
-.DS_Store
+# Frontend dependencies and local caches
+web/node_modules/
+web/.vite/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Local workbooks
 *.xlsx
 *.xlsm
-*.tmp
+*.xlsb
+!testdata/**/*.xlsx
+!testdata/**/*.xlsm
+!testdata/**/*.xlsb
+
+# Go build and test outputs
+/xlsx-viewer
 /bin/
 /dist/
+*.test
+*.tmp
+coverage.out
 
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Editor and operating system files
+.DS_Store
+.idea/
+.vscode/
+*.swp

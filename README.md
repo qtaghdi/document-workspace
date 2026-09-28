@@ -11,7 +11,7 @@ The repository currently contains two implementations:
 
 The Go service exposes:
 
-- a browser spreadsheet at `/`;
+- a Univer-powered browser spreadsheet at `/`;
 - a Streamable HTTP MCP endpoint at `/mcp`;
 - JSON endpoints for workbook state and edits;
 - an SSE event stream used to visualize AI edits;
@@ -52,17 +52,25 @@ Example operation payload:
 ## Development
 
 ```bash
+cd web
+npm install
+npm run build
+cd ..
 go test ./...
 go build ./cmd/xlsx-viewer
 python3 test_server.py
 ```
 
+The browser application uses plain TypeScript, Univer, Vite, and Tailwind CSS.
+The production build is written to `internal/httpapi/static` and embedded in the
+Go binary. React is not required.
+
 Project documentation:
 
 - [`docs/product-plan.md`](docs/product-plan.md)
 - [`docs/architecture.md`](docs/architecture.md)
+- [`docs/adr/0001-spreadsheet-engine.md`](docs/adr/0001-spreadsheet-engine.md)
 - [`CHANGELOG.md`](CHANGELOG.md)
 
 Repository conventions and engineering requirements are defined in
 [`AGENTS.md`](AGENTS.md).
-

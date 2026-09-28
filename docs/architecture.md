@@ -54,10 +54,24 @@ valid session cookie and a same-origin request.
 
 ### Browser UI
 
-The current embedded HTML is a vertical slice. The production UI will be a
-separate TypeScript and React application with a virtualized grid. It will keep
-focus, selection, and animation state locally while treating server snapshots
-and revisions as authoritative.
+The browser UI is a TypeScript application bundled with Vite. Univer is the
+selected spreadsheet engine for the current validation phase. Application
+styling uses Tailwind CSS, while Univer provides editor-specific styles.
+
+All editor-specific behavior is isolated behind `SpreadsheetEngine`. The
+adapter receives workbook snapshots, emits confirmed human cell edits, and
+applies committed remote events. This boundary preserves the option to replace
+Univer with ONLYOFFICE or a custom engine without moving validation and
+persistence out of Go.
+
+The Go service remains authoritative. Browser focus, selection, draft text,
+presence, and animation are ephemeral. The current adapter synchronizes
+confirmed single-cell edits and committed AI edits. Multi-cell operations,
+formatting, structural changes, and true remote selection rendering remain
+planned work.
+
+See [`adr/0001-spreadsheet-engine.md`](adr/0001-spreadsheet-engine.md) for the
+engine comparison and decision.
 
 ## State Model
 
@@ -124,10 +138,10 @@ authorization.
 
 ## Architectural Decisions Pending
 
-- Grid library selection after interaction prototypes and licensing review.
+- Univer Pro licensing for collaboration, presence, and XLSX exchange.
+- Preset versus plugin mode and the production JavaScript startup budget.
 - Formula calculation strategy.
 - Unsupported XLSX feature detection strategy.
 - Operation log persistence format.
 - SSE replay retention and reconnect policy.
 - OAuth provider and hosted tenancy model.
-

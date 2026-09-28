@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/qtaghdi/xlsx-viewer/internal/workbook"
 )
 
-//go:embed static/index.html
+//go:embed static/index.html static/assets/*
 var staticFS embed.FS
 
 type Server struct {
@@ -49,11 +50,16 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) routes() {
+	assets, err := fs.Sub(staticFS, "static")
+	if err != nil {
+		panic(fmt.Sprintf("prepare embedded UI: %v", err))
+	}
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	s.mux.Handle("/mcp", s.requireBearer(s.mcpHandler()))
 	s.mux.HandleFunc("GET /{$}", s.index)
+	s.mux.Handle("GET /assets/", s.requireSession(http.FileServer(http.FS(assets))))
 	s.mux.Handle("GET /api/workbook", s.requireSession(http.HandlerFunc(s.getWorkbook)))
 	s.mux.Handle("GET /api/range", s.requireSession(http.HandlerFunc(s.getRange)))
 	s.mux.Handle("POST /api/operations", s.requireSession(http.HandlerFunc(s.applyOperations)))
@@ -219,7 +225,7 @@ func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:")
 		next.ServeHTTP(w, r)
 	})
 }

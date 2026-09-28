@@ -9,6 +9,17 @@ and this project intends to follow Semantic Versioning when releases begin.
 
 ### Added
 
+- Added a Univer-powered spreadsheet UI behind a replaceable engine interface.
+- Added Vite and Tailwind CSS build tooling without adding a React application
+  dependency.
+- Added human single-cell persistence and committed AI edit synchronization in
+  the Univer adapter.
+- Added an integration test for authenticated delivery of the embedded UI and
+  its JavaScript assets.
+- Added an architecture decision comparing Univer, ONLYOFFICE, and a custom
+  spreadsheet engine.
+- Added repository ignore rules for local workbooks, secrets, dependencies, and
+  build artifacts.
 - Added a Go service foundation using the official MCP Go SDK and Excelize.
 - Added `get_workbook`, `read_range`, and `apply_operations` MCP tools.
 - Added revision-based conflict detection for workbook writes.
@@ -21,6 +32,10 @@ and this project intends to follow Semantic Versioning when releases begin.
 
 ### Security
 
+- Updated Univer to 1.0.2 after dependency audit and verified that the installed
+  dependency tree reports no known vulnerabilities.
+- Allowed only the data and blob image, font, and worker sources required by
+  Univer while keeping scripts restricted to same-origin assets.
 - Added random session tokens, strict session cookies, browser Origin checks,
   request body limits, range size limits, and baseline security headers.
 
@@ -31,4 +46,3 @@ and this project intends to follow Semantic Versioning when releases begin.
 - Added the initial Python XLSX viewer and editor proof of concept.
 - Added support for worksheet tabs, direct cell edits, list validation controls,
   and a limited subset of expression-based conditional formatting.
-
