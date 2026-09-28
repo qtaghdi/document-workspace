@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>xlsx-viewer</title>
+<style>
+  :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#17202a;background:#f7f8fa}
+  *{box-sizing:border-box}body{margin:0}header{height:52px;padding:0 16px;display:flex;align-items:center;gap:12px;background:#fff;border-bottom:1px solid #dfe3e8;position:sticky;top:0;z-index:3}
+  #name{font-weight:700}#status{color:#64748b;font-size:12px}.spacer{flex:1}select{border:1px solid #cbd5e1;border-radius:6px;padding:6px 10px;background:#fff}
+  main{overflow:auto;height:calc(100vh - 52px)}table{border-collapse:separate;border-spacing:0;background:#fff;min-width:100%}th,td{border-right:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;min-width:96px;height:28px;padding:4px 7px;white-space:pre;position:relative}
+  th{background:#f1f5f9;color:#64748b;text-align:center;font-size:11px;position:sticky;top:0;z-index:2}.row{min-width:44px;left:0;z-index:1;position:sticky}td:focus{outline:2px solid #2563eb;outline-offset:-2px}
+  td.ai{outline:2px solid #8b5cf6;outline-offset:-2px;background:#f5f3ff}td.ai::after{content:"AI";position:absolute;right:-1px;top:-17px;background:#7c3aed;color:#fff;font-size:10px;padding:2px 5px;border-radius:4px 4px 0 0}
+  .dot{width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block}.error{color:#dc2626!important}
+</style>
+<header><span class="dot"></span><span id="name">Loading…</span><select id="sheets"></select><span class="spacer"></span><span id="status">연결 중</span></header>
+<main><table id="grid"></table></main>
+<script>
+const grid=document.querySelector('#grid'),sheets=document.querySelector('#sheets'),statusEl=document.querySelector('#status');
+let state={revision:0,sheet:''};
+const colName=n=>{let s='';while(n){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26)}return s};
+async function json(url,opts){const r=await fetch(url,opts);const body=await r.json();if(!r.ok)throw new Error(body.error||r.statusText);return body}
+async function boot(){try{const book=await json('/api/workbook');document.querySelector('#name').textContent=book.name;state.revision=book.revision;sheets.innerHTML=book.sheets.map(x=>`<option>${escapeHTML(x)}</option>`).join('');state.sheet=book.sheets[0];await load();listen();statusEl.textContent=`revision ${state.revision}`}catch(e){fail(e)}}
+async function load(){const data=await json(`/api/range?sheet=${encodeURIComponent(state.sheet)}&range=A1:Z50`);render(data.rows)}
+function render(rows){let out='<thead><tr><th class="row"></th>';for(let c=1;c<=26;c++)out+=`<th>${colName(c)}</th>`;out+='</tr></thead><tbody>';rows.forEach((row,i)=>{out+=`<tr><th class="row">${i+1}</th>`;row.forEach(cell=>{const shown=cell.formula?'='+cell.formula:cell.value;out+=`<td contenteditable="plaintext-only" data-cell="${cell.address}">${escapeHTML(shown)}</td>`});out+='</tr>'});grid.innerHTML=out+'</tbody>';grid.querySelectorAll('td').forEach(td=>td.addEventListener('blur',saveCell))}
+async function saveCell(e){const td=e.currentTarget,value=td.innerText;try{const body=await json('/api/operations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({baseRevision:state.revision,operations:[value.startsWith('=')?{type:'set_formula',sheet:state.sheet,cell:td.dataset.cell,formula:value}:{type:'set_cell',sheet:state.sheet,cell:td.dataset.cell,value}]})});state.revision=body.workbook.revision;statusEl.textContent=`revision ${state.revision}`}catch(err){fail(err);await refresh()}}
+function listen(){const es=new EventSource('/api/events');es.addEventListener('workbook',e=>{const event=JSON.parse(e.data);if(event.type==='cell.commit'&&event.revision>state.revision)state.revision=event.revision;if(event.actor==='ai'&&event.sheet===state.sheet&&(event.type==='cell.typing'||event.type==='cell.commit'))animate(event)});es.onerror=()=>statusEl.textContent='이벤트 재연결 중'}
+function animate(event){const td=grid.querySelector(`[data-cell="${CSS.escape(event.cell)}"]`);if(!td)return;td.classList.add('ai');if(event.type==='cell.typing'){const text=event.text;td.textContent='';let i=0;const timer=setInterval(()=>{td.textContent=text.slice(0,++i);if(i>=text.length){clearInterval(timer)}},Math.max(20,Math.min(70,600/Math.max(1,text.length))))}else{td.textContent=event.text;setTimeout(()=>td.classList.remove('ai'),800);statusEl.textContent=`AI 저장 · revision ${event.revision}`}}
+async function refresh(){const book=await json('/api/workbook');state.revision=book.revision;await load()}
+function escapeHTML(value){const d=document.createElement('div');d.textContent=value??'';return d.innerHTML}
+function fail(e){statusEl.textContent=e.message;statusEl.classList.add('error')}
+sheets.addEventListener('change',async()=>{state.sheet=sheets.value;await load()});boot();
+</script>
+</html>
