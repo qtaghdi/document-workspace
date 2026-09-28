@@ -39,6 +39,11 @@ Go service
 The server owns authoritative workbook data. UI state such as focus, selection,
 open panels, and in-progress animation remains ephemeral in the browser.
 
+This repository is a polyglot monorepo. Keep the Go service, TypeScript UI,
+generated embedded assets, tests, and architecture documents versioned and
+verified together. Do not split them into separate repositories without a
+deployment or ownership requirement.
+
 Read [`docs/architecture.md`](docs/architecture.md) before changing a system
 boundary or adding infrastructure.
 
@@ -50,6 +55,8 @@ boundary or adding infrastructure.
 - `net/http` for the current HTTP API and SSE transport.
 - TypeScript with Univer for the spreadsheet surface. Keep Univer behind the
   repository's `SpreadsheetEngine` boundary.
+- Univer open-source packages only. Do not add `@univerjs-pro/*` packages or
+  depend on Univer Pro services without an explicit repository owner decision.
 - Vite for browser bundling and Tailwind CSS for application shell styling.
   React is not required by the application architecture.
 - SSE for server-to-UI edit events. Add WebSocket only when bidirectional
@@ -157,6 +164,7 @@ Publish animation intent, then commit at cell or batch granularity.
   failed states distinctly.
 - Keep all Univer packages on the same version and audit production
   dependencies after an upgrade.
+- Run the OSS dependency check whenever frontend dependencies change.
 - Test current desktop, a small laptop viewport, and a mobile fallback.
 
 ## Comments and Documentation
@@ -220,7 +228,21 @@ and expected outputs.
 ## Git and Change Management
 
 - Preserve the initial Python MVP until its behavior is covered by Go tests.
-- Make focused commits with English imperative commit messages.
+- Use Conventional Commits with an English imperative subject:
+  `<type>(<scope>): <summary>`.
+- Allowed commit types are `feat`, `fix`, `docs`, `refactor`, `test`, `build`,
+  `ci`, `chore`, `perf`, `revert`, and `security`.
+- Prefer scopes such as `go`, `web`, `mcp`, `workbook`, `realtime`, `docs`,
+  `build`, and `deps`. Omit the scope only when a change truly spans the whole
+  repository.
+- Use lowercase branch names in the form `<type>/<short-description>`, such as
+  `feat/ai-presence` or `fix/revision-conflict`.
+- Keep commit subjects at 72 characters or fewer and do not end them with a
+  period.
+- Use the repository issue and pull request templates. Pull request titles must
+  follow the same Conventional Commits format.
+- Make focused commits and keep generated frontend assets in the same commit as
+  their source changes.
 - Do not combine unrelated formatting or cleanup with a feature change.
 - Do not rewrite shared history unless the repository owner explicitly asks.
 - Update documentation and the changelog in the same commit as the behavior.

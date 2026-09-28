@@ -44,8 +44,11 @@ Exit criteria:
 - Integrate Univer behind a replaceable `SpreadsheetEngine` boundary.
 - Bundle the TypeScript application with Vite and style the application shell
   with Tailwind CSS.
-- Validate the Univer Pro licensing and deployment model before adopting its
-  collaboration and XLSX exchange services.
+- Use only Univer open-source packages.
+- Implement AI presence and remote selections through the Go realtime layer and
+  an OSS UI overlay.
+- Extend the Excelize snapshot adapter for styles, merges, validations, and
+  other workbook features.
 - Add cell and range selection.
 - Add keyboard navigation.
 - Add multi-cell copy and paste.
@@ -104,7 +107,7 @@ Exit criteria:
 2. Add operation count and workbook size limits.
 3. Add event replay with `Last-Event-ID`.
 4. Extend the Univer bridge to batch paste, formatting, and structural edits.
-5. Add AI presence through a licensed collaboration spike or a safe overlay.
+5. Add AI presence through a Go presence channel and a safe OSS overlay.
 6. Build the first XLSX compatibility corpus.
 7. Replace preset mode with a measured plugin-mode bundle if it reduces startup
    cost without losing required behavior.

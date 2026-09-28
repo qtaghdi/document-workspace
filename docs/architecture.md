@@ -70,6 +70,10 @@ confirmed single-cell edits and committed AI edits. Multi-cell operations,
 formatting, structural changes, and true remote selection rendering remain
 planned work.
 
+Only Univer open-source packages are allowed. The Go service will provide
+collaboration, presence state, operation ordering, and XLSX persistence. The UI
+will render AI cursors and selections through an OSS adapter or a custom overlay.
+
 See [`adr/0001-spreadsheet-engine.md`](adr/0001-spreadsheet-engine.md) for the
 engine comparison and decision.
 
@@ -138,7 +142,9 @@ authorization.
 
 ## Architectural Decisions Pending
 
-- Univer Pro licensing for collaboration, presence, and XLSX exchange.
+- OSS-only AI cursor and remote selection rendering strategy.
+- Bidirectional presence transport and reconnect semantics.
+- Excelize-to-Univer style and workbook feature mapping.
 - Preset versus plugin mode and the production JavaScript startup budget.
 - Formula calculation strategy.
 - Unsupported XLSX feature detection strategy.

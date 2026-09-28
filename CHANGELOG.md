@@ -20,6 +20,10 @@ and this project intends to follow Semantic Versioning when releases begin.
   spreadsheet engine.
 - Added repository ignore rules for local workbooks, secrets, dependencies, and
   build artifacts.
+- Added root monorepo commands for frontend, Go, build, test, audit, and local
+  development workflows.
+- Added an OSS-only dependency guard that rejects Univer Pro packages.
+- Added contribution rules and GitHub templates for issues and pull requests.
 - Added a Go service foundation using the official MCP Go SDK and Excelize.
 - Added `get_workbook`, `read_range`, and `apply_operations` MCP tools.
 - Added revision-based conflict detection for workbook writes.
@@ -29,6 +33,13 @@ and this project intends to follow Semantic Versioning when releases begin.
 - Added an SSE stream for AI cursor, typing, and commit events.
 - Added workbook persistence and formula round-trip tests.
 - Added repository architecture, product planning, and engineering guidance.
+
+### Changed
+
+- Defined the repository as a polyglot monorepo with Go as the authoritative
+  workbook and collaboration service.
+- Replaced the planned Univer Pro evaluation with an OSS-only presence and XLSX
+  integration strategy owned by this repository.
 
 ### Security
 

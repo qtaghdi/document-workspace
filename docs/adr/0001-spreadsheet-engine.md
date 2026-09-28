@@ -1,6 +1,6 @@
 # ADR 0001: Use Univer Behind a Spreadsheet Engine Boundary
 
-- Status: Accepted for technical validation
+- Status: Accepted
 - Date: 2026-09-28
 
 ## Context
@@ -41,14 +41,19 @@ collaboration layer from scratch was also considered.
 
 ## Decision
 
-Use Univer as the first production candidate, isolated behind a
-`SpreadsheetEngine` interface. Use the open-source core for the first editor
-spike. Evaluate Univer Pro collaboration, presence, and XLSX exchange before a
-commercial commitment.
+Use Univer open-source packages as the spreadsheet UI engine, isolated behind a
+`SpreadsheetEngine` interface. Do not use Univer Pro packages or services. The
+frontend dependency check rejects `@univerjs-pro/*` packages if they enter the
+lock file.
 
 The Go service remains authoritative for the current phase. It owns revisions,
 validated operations, conflict detection, persistence, authentication, and MCP
 tools. Univer is a rendering and interaction engine, not the source of truth.
+
+Build collaboration and AI presence in the Go service. Use the operation log,
+revisions, SSE, and a future bidirectional presence channel. Continue to use
+Excelize for XLSX persistence. Expand the Go-to-Univer snapshot adapter to carry
+styles, merged cells, validations, drawings, and other supported metadata.
 
 React is not an architectural requirement. The initial integration uses plain
 TypeScript. Vite bundles the browser code, and Tailwind CSS provides application
@@ -65,8 +70,8 @@ shell styling. Univer supplies its own editor styles.
 
 ### Negative
 
-- XLSX import, export, collaboration, and presence require a separate licensing
-  and infrastructure decision.
+- Collaboration, presence overlays, and high-fidelity XLSX mapping are product
+  code that this repository must build and maintain.
 - Preset mode produces a large initial bundle. Plugin mode and code splitting
   must be evaluated before release.
 - The current bridge synchronizes confirmed single-cell edits. Multi-cell paste,
@@ -79,16 +84,18 @@ shell styling. Univer supplies its own editor styles.
 
 Re-evaluate this decision if any of these conditions are met:
 
-- Required Pro licensing is incompatible with the product business model.
 - The compatibility corpus shows unacceptable XLSX loss.
 - MCP App host constraints prevent the Univer surface from operating reliably.
 - Bundle size cannot meet an agreed startup budget after plugin-mode work.
-- Presence cannot represent an AI actor without weakening authorization or
-  revision guarantees.
+- The OSS rendering APIs cannot represent an AI actor without weakening
+  authorization or revision guarantees.
 
 If Univer fails, evaluate ONLYOFFICE behind the same engine boundary. Build a
 custom engine only for missing layers that cannot be supplied or replaced, not
 as the first implementation of the entire spreadsheet stack.
+
+Adopting Univer Pro requires a new ADR and explicit approval from the repository
+owner.
 
 ## References
 

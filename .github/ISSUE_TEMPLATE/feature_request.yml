@@ -1,0 +1,48 @@
+name: Feature request
+description: Propose a focused product or engineering improvement.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the user or system problem before proposing a solution.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe observable behavior and acceptance criteria.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+      description: Optional implementation or architecture notes.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Workbook and XLSX
+        - Browser UI
+        - MCP tools
+        - Realtime collaboration
+        - Authentication and security
+        - Build and deployment
+        - Documentation
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: The proposal works without Univer Pro packages or services.
+          required: true
+        - label: The proposal keeps MCP tools useful when embedded UI is unavailable.
+          required: true

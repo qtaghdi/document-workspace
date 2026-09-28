@@ -7,6 +7,17 @@ The repository currently contains two implementations:
 - `server.py`: the preserved Python proof of concept.
 - `cmd/xlsx-viewer`: the new Go service foundation.
 
+This is a polyglot monorepo:
+
+- `cmd/xlsx-viewer` contains the Go executable.
+- `internal/workbook` contains the Go workbook domain and XLSX persistence.
+- `internal/httpapi` contains the Go HTTP, SSE, MCP, and embedded UI adapters.
+- `web` contains the TypeScript and Univer browser application.
+- `docs` contains product, architecture, and decision records.
+
+Univer is used through open-source packages only. The repository rejects
+`@univerjs-pro/*` dependencies during frontend builds.
+
 ## Go service
 
 The Go service exposes:
@@ -52,24 +63,27 @@ Example operation payload:
 ## Development
 
 ```bash
-cd web
-npm install
-npm run build
-cd ..
-go test ./...
-go build ./cmd/xlsx-viewer
-python3 test_server.py
+make web-install
+make verify
+make build
 ```
 
 The browser application uses plain TypeScript, Univer, Vite, and Tailwind CSS.
 The production build is written to `internal/httpapi/static` and embedded in the
 Go binary. React is not required.
 
+Run a workbook locally:
+
+```bash
+make dev FILE=/absolute/path/to/workbook.xlsx
+```
+
 Project documentation:
 
 - [`docs/product-plan.md`](docs/product-plan.md)
 - [`docs/architecture.md`](docs/architecture.md)
 - [`docs/adr/0001-spreadsheet-engine.md`](docs/adr/0001-spreadsheet-engine.md)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - [`CHANGELOG.md`](CHANGELOG.md)
 
 Repository conventions and engineering requirements are defined in
