@@ -8,7 +8,7 @@ session.
 
 ```text
 MCP client
-    | get_workbook, read_range, apply_operations
+    | open_workbook, get_workbook, read_range, apply_operations
     v
 Go service
     | workbook session
@@ -29,9 +29,16 @@ can distinguish side effects.
 
 Current tools:
 
+- `open_workbook`
 - `get_workbook`
 - `read_range`
 - `apply_operations`
+- `update_presence`
+
+`open_workbook` advertises the `ui://xlsx-viewer/workbook` resource using the
+MCP Apps metadata contract. The resource is a self-contained HTML bundle. It
+uses app-only tools for event polling, human operations, and human presence.
+The ordinary tools remain available when a client does not render MCP Apps.
 
 ### Workbook Domain
 
@@ -64,15 +71,20 @@ applies committed remote events. This boundary preserves the option to replace
 Univer with ONLYOFFICE or a custom engine without moving validation and
 persistence out of Go.
 
-The Go service remains authoritative. Browser focus, selection, draft text,
-presence, and animation are ephemeral. The current adapter synchronizes
-confirmed single-cell edits and committed AI edits. Multi-cell operations,
-formatting, structural changes, and true remote selection rendering remain
-planned work.
+The Go service remains authoritative. Browser focus, draft text, presence, and
+animation are ephemeral. The adapter synchronizes confirmed cell edits,
+rectangular paste, basic formatting, merged cells, and committed AI edits. AI
+selections are rendered with Univer's OSS range highlight API.
 
 Only Univer open-source packages are allowed. The Go service will provide
 collaboration, presence state, operation ordering, and XLSX persistence. The UI
 will render AI cursors and selections through an OSS adapter or a custom overlay.
+
+The same TypeScript application has two production entries. The standalone
+entry uses code-split same-origin assets and SSE. The MCP App entry is bundled
+as one HTML resource and uses the official postMessage bridge plus bounded
+event polling. Both entries call the same Go workbook domain and operation
+contracts.
 
 See [`adr/0001-spreadsheet-engine.md`](adr/0001-spreadsheet-engine.md) for the
 engine comparison and decision.
@@ -102,16 +114,22 @@ keep the active revision pointer in a relational database.
 ## Realtime Events
 
 The initial transport is SSE because the dominant flow is server to browser.
-Events contain a sequence, revision, actor, type, sheet, cell, and optional text.
+Events contain a sequence, revision, actor, type, sheet, cell or range, and
+operation-specific data.
 
 Initial event types:
 
-- `cursor.move`
+- `presence.update`
 - `cell.typing`
 - `cell.commit`
+- `range.commit`
+- `range.format`
+- `range.merge_cells`
+- `range.unmerge_cells`
 
 The browser may animate `cell.typing`, but persistence occurs at cell or batch
-granularity. A later version will add replay based on `Last-Event-ID`.
+granularity. The service retains a bounded in-memory event history and replays
+events after the browser's `Last-Event-ID` on reconnect.
 
 ## Security Boundaries
 
@@ -119,7 +137,9 @@ Workbook files, formulas, sheet names, cell values, MCP inputs, and browser
 inputs are untrusted. The service validates them without evaluating workbook
 content as code.
 
-Local mode uses an unguessable bearer token and strict browser session cookie.
+Local mode uses separate unguessable browser and MCP tokens plus a strict
+browser session cookie. The credentials separate human UI access from AI tool
+access, but they are not a hosted identity system.
 Hosted mode will replace this with authenticated user sessions and per-workbook
 authorization.
 
@@ -142,12 +162,13 @@ authorization.
 
 ## Architectural Decisions Pending
 
-- OSS-only AI cursor and remote selection rendering strategy.
-- Bidirectional presence transport and reconnect semantics.
-- Excelize-to-Univer style and workbook feature mapping.
-- Preset versus plugin mode and the production JavaScript startup budget.
+- Extended Excelize-to-Univer mappings for validation, conditional formatting,
+  charts, images, and unsupported feature warnings.
+- Preset versus plugin mode and the production JavaScript startup budget. The
+  self-contained MCP App bundle is currently large and must be reduced before
+  broad host certification.
 - Formula calculation strategy.
 - Unsupported XLSX feature detection strategy.
 - Operation log persistence format.
-- SSE replay retention and reconnect policy.
+- Durable event replay retention policy.
 - OAuth provider and hosted tenancy model.

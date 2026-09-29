@@ -17,14 +17,18 @@ import (
 func main() {
 	file := flag.String("file", "", "path to the XLSX workbook to open")
 	addr := flag.String("addr", "127.0.0.1:8765", "HTTP listen address")
-	token := flag.String("token", "", "session token; generated when omitted")
+	browserToken := flag.String("browser-token", "", "browser session token; generated when omitted")
+	mcpToken := flag.String("mcp-token", "", "MCP bearer token; generated when omitted")
 	flag.Parse()
 	if *file == "" {
 		fmt.Fprintln(os.Stderr, "usage: xlsx-viewer -file <workbook.xlsx> [-addr 127.0.0.1:8765]")
 		os.Exit(2)
 	}
-	if *token == "" {
-		*token = randomToken()
+	if *browserToken == "" {
+		*browserToken = randomToken()
+	}
+	if *mcpToken == "" {
+		*mcpToken = randomToken()
 	}
 	session, err := workbook.Open(*file)
 	if err != nil {
@@ -34,12 +38,12 @@ func main() {
 
 	server := &http.Server{
 		Addr:              *addr,
-		Handler:           httpapi.New(session, *token).Handler(),
+		Handler:           httpapi.NewWithTokens(session, *browserToken, *mcpToken).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-	log.Printf("viewer: http://%s/?token=%s", *addr, *token)
-	log.Printf("mcp: http://%s/mcp (Authorization: Bearer %s)", *addr, *token)
+	log.Printf("viewer: http://%s/?token=%s", *addr, *browserToken)
+	log.Printf("mcp: http://%s/mcp (Authorization: Bearer %s)", *addr, *mcpToken)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}

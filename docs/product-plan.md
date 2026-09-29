@@ -22,7 +22,7 @@ tools, authentication, and production deployment.
 
 ## Phase 1: Safe Go Foundation
 
-Status: in progress.
+Status: complete for local single-workbook mode.
 
 - Open one XLSX workbook as a session.
 - Expose workbook metadata and range reads.
@@ -31,7 +31,7 @@ Status: in progress.
 - Persist through a temporary file and atomic replacement.
 - Expose Streamable HTTP MCP tools.
 - Publish ordered edit events through SSE.
-- Protect local browser and MCP access with a session token.
+- Protect local browser and MCP access with separate tokens.
 
 Exit criteria:
 
@@ -40,6 +40,10 @@ Exit criteria:
 - The browser reflects AI edit events.
 
 ## Phase 2: Spreadsheet Editing Experience
+
+Status: in progress. Range paste, basic styles, merged cells, presence, and
+reconnect replay are implemented. Broader structural edits and compatibility
+coverage remain.
 
 - Integrate Univer behind a replaceable `SpreadsheetEngine` boundary.
 - Bundle the TypeScript application with Vite and style the application shell
@@ -66,13 +70,20 @@ Exit criteria:
 
 ## Phase 3: MCP App Packaging
 
-- Register an MCP App UI resource.
+Status: in progress. The resource, tool metadata, dual transport adapter, and
+protocol integration test are implemented. Live host certification and bundle
+size reduction remain.
+
+- Register an MCP App UI resource. Complete.
 - Associate UI metadata only with tools that need the spreadsheet surface.
-- Use host capability detection.
-- Return useful text and structured content when UI is unavailable.
+  Complete.
+- Use the official MCP App postMessage bridge inside an embedded host. Complete.
+- Keep ordinary workbook tools available when UI is unavailable. Complete.
+- Reduce the self-contained Univer bundle before broad host certification.
+- Verify Claude Desktop and Codex host behavior and document any capability
+  differences.
 - Show partial tool input as uncommitted ghost text only when the host supports
   it.
-- Verify supported hosts and document fallback behavior.
 
 ## Phase 4: Hosted Service
 
@@ -103,11 +114,9 @@ Exit criteria:
 
 ## Immediate Next Work
 
-1. Add HTTP and MCP integration tests.
-2. Add operation count and workbook size limits.
-3. Add event replay with `Last-Event-ID`.
-4. Extend the Univer bridge to batch paste, formatting, and structural edits.
-5. Add AI presence through a Go presence channel and a safe OSS overlay.
-6. Build the first XLSX compatibility corpus.
-7. Replace preset mode with a measured plugin-mode bundle if it reduces startup
+1. Build the first XLSX compatibility corpus.
+2. Add row and column operations with undo and redo records.
+3. Add unsupported feature detection and save warnings.
+4. Verify the MCP App in supported Claude Desktop and Codex host versions.
+5. Replace preset mode with a measured plugin-mode bundle if it reduces startup
    cost without losing required behavior.

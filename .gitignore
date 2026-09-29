@@ -2,6 +2,7 @@
 web/node_modules/
 web/.vite/
 internal/httpapi/static/assets/
+internal/httpapi/static/app.html
 
 # Local configuration and secrets
 .env

@@ -24,25 +24,35 @@ The Go service exposes:
 
 - a Univer-powered browser spreadsheet at `/`;
 - a Streamable HTTP MCP endpoint at `/mcp`;
+- an MCP App resource that embeds the spreadsheet in compatible clients;
 - JSON endpoints for workbook state and edits;
 - an SSE event stream used to visualize AI edits;
+- live human and AI selection presence with reconnect replay;
+- atomic range paste, basic formatting, and merge operations;
 - revision checks and atomic XLSX saves.
 
 Run it with an existing workbook:
 
 ```bash
-go run ./cmd/xlsx-viewer -file ./example.xlsx
+make dev FILE=/absolute/path/to/example.xlsx
 ```
 
-The server prints a tokenized local URL. Open that exact URL in a browser. MCP
-clients should connect to `http://127.0.0.1:8765/mcp` and send the printed token
-as a Bearer token.
+The server prints separate browser and MCP credentials. Open the tokenized
+browser URL exactly as printed. MCP clients should connect to
+`http://127.0.0.1:8765/mcp` and send the separately printed MCP token as a
+Bearer token.
 
 Available MCP tools:
 
+- `open_workbook`, which requests the interactive MCP App surface;
 - `get_workbook`
 - `read_range`
 - `apply_operations`
+- `update_presence`
+
+The embedded app uses app-only `get_events`, `apply_user_operations`, and
+`update_user_presence` tools for its bridge. Clients without MCP Apps can use
+the ordinary workbook tools and the standalone browser URL.
 
 Example operation payload:
 
@@ -70,7 +80,8 @@ make build
 
 The browser application uses plain TypeScript, Univer, Vite, and Tailwind CSS.
 The production build is written to `internal/httpapi/static` and embedded in the
-Go binary. Generated files under `internal/httpapi/static/assets` are ignored by
+Go binary. Vite emits a code-split standalone browser build and a self-contained
+`app.html` for MCP App hosts. Generated assets and `app.html` are ignored by
 Git. Use `make build`, rather than a standalone `go build`, when producing a
 release binary. React is not required.
 

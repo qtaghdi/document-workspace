@@ -32,8 +32,18 @@ and this project intends to follow Semantic Versioning when releases begin.
 - Added an authenticated browser session and a token-protected MCP endpoint.
 - Added a browser spreadsheet prototype with direct cell editing.
 - Added an SSE stream for AI cursor, typing, and commit events.
+- Added bidirectional human and AI range presence with OSS selection rendering.
+- Added bounded SSE event replay using `Last-Event-ID`.
+- Added atomic rectangular paste, basic cell formatting, and merge operations.
+- Added initial XLSX style and merged-cell rendering in the Univer adapter.
+- Added separate browser and MCP credentials for local role separation.
+- Added workbook and operation count limits.
 - Added workbook persistence and formula round-trip tests.
 - Added repository architecture, product planning, and engineering guidance.
+- Added an MCP App resource, `open_workbook` tool metadata, and app-only
+  collaboration tools using the official MCP Apps bridge.
+- Added separate browser and self-contained MCP App production bundles.
+- Added an in-memory MCP protocol test for the interactive tool and resource.
 
 ### Changed
 
