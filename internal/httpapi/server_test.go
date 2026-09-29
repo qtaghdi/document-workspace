@@ -3,9 +3,13 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,6 +18,32 @@ import (
 	"github.com/qtaghdi/xlsx-viewer/internal/workbook"
 	"github.com/xuri/excelize/v2"
 )
+
+const (
+	stdioHelperEnv     = "XLSX_VIEWER_STDIO_HELPER"
+	stdioHelperFileEnv = "XLSX_VIEWER_STDIO_FILE"
+)
+
+func TestMain(m *testing.M) {
+	if os.Getenv(stdioHelperEnv) == "1" {
+		runStdioHelper()
+		return
+	}
+	os.Exit(m.Run())
+}
+
+func runStdioHelper() {
+	session, err := workbook.Open(os.Getenv(stdioHelperFileEnv))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer session.Close()
+	if err := NewWithTokens(session, "", "").RunStdio(context.Background()); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
 
 func TestEmbeddedUIRequiresSessionAndServesAssets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "book.xlsx")
@@ -104,6 +134,9 @@ func TestMCPAppToolAndResource(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clientSession.Close()
+	if got := clientSession.InitializeResult().Instructions; got != serverInstructions {
+		t.Fatalf("server instructions = %q, want %q", got, serverInstructions)
+	}
 
 	tools, err := clientSession.ListTools(context.Background(), nil)
 	if err != nil {
@@ -123,6 +156,9 @@ func TestMCPAppToolAndResource(t *testing.T) {
 	if !ok || ui["resourceUri"] != appResourceURI {
 		t.Fatalf("open_workbook UI metadata = %#v", openTool.Meta)
 	}
+	if openTool.Meta["openai/outputTemplate"] != appResourceURI {
+		t.Fatalf("open_workbook compatibility metadata = %#v", openTool.Meta)
+	}
 
 	resource, err := clientSession.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: appResourceURI})
 	if err != nil {
@@ -133,6 +169,50 @@ func TestMCPAppToolAndResource(t *testing.T) {
 	}
 	if !strings.Contains(resource.Contents[0].Text, "Workbook editor") {
 		t.Fatal("MCP App resource is missing the workbook editor")
+	}
+}
+
+func TestStdioTransport(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "book.xlsx")
+	file := excelize.NewFile()
+	if err := file.SetCellValue("Sheet1", "A1", "stdio"); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	command := exec.Command(os.Args[0])
+	command.Env = append(os.Environ(), stdioHelperEnv+"=1", stdioHelperFileEnv+"="+path)
+	client := mcp.NewClient(&mcp.Implementation{Name: "stdio-test-client", Version: "0.1.0"}, nil)
+	clientSession, err := client.Connect(context.Background(), &mcp.CommandTransport{Command: command}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	if got := clientSession.InitializeResult().Instructions; got != serverInstructions {
+		t.Fatalf("stdio server instructions = %q, want %q", got, serverInstructions)
+	}
+	result, err := clientSession.CallTool(context.Background(), &mcp.CallToolParams{Name: "read_range", Arguments: map[string]any{
+		"sheet": "Sheet1",
+		"range": "A1",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.IsError || result.StructuredContent == nil {
+		t.Fatalf("stdio read_range result = %#v", result)
+	}
+	structured, err := json.Marshal(result.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(structured, []byte(`"stdio"`)) {
+		t.Fatalf("stdio read_range structured content = %s", structured)
 	}
 }
 

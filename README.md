@@ -42,6 +42,18 @@ browser URL exactly as printed. MCP clients should connect to
 `http://127.0.0.1:8765/mcp` and send the separately printed MCP token as a
 Bearer token.
 
+Local desktop hosts can launch the same binary over stdio. This mode keeps all
+workbook access on the machine and does not require a listening port:
+
+```bash
+make build
+./bin/xlsx-viewer -transport stdio -file /absolute/path/to/workbook.xlsx
+```
+
+The host must launch the command and communicate over stdin and stdout. See
+[`docs/host-compatibility.md`](docs/host-compatibility.md) for Claude Desktop
+and Codex configuration examples and the current certification matrix.
+
 Available MCP tools:
 
 - `open_workbook`, which requests the interactive MCP App surface;
@@ -101,6 +113,7 @@ Project documentation:
 
 - [`docs/product-plan.md`](docs/product-plan.md)
 - [`docs/architecture.md`](docs/architecture.md)
+- [`docs/host-compatibility.md`](docs/host-compatibility.md)
 - [`docs/adr/0001-spreadsheet-engine.md`](docs/adr/0001-spreadsheet-engine.md)
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - [`CHANGELOG.md`](CHANGELOG.md)

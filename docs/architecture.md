@@ -35,10 +35,16 @@ Current tools:
 - `apply_operations`
 - `update_presence`
 
-`open_workbook` advertises the `ui://xlsx-viewer/workbook` resource using the
-MCP Apps metadata contract. The resource is a self-contained HTML bundle. It
-uses app-only tools for event polling, human operations, and human presence.
-The ordinary tools remain available when a client does not render MCP Apps.
+`open_workbook` advertises the versioned
+`ui://xlsx-viewer/workbook/v1.html` resource using the MCP Apps metadata
+contract. The resource is a self-contained HTML bundle. It uses app-only tools
+for event polling, human operations, and human presence. The ordinary tools
+remain available when a client does not render MCP Apps.
+
+The same MCP server supports Streamable HTTP and stdio. HTTP is the default for
+the standalone browser and future hosted deployment. Stdio lets local desktop
+hosts launch the Go binary without opening a network port. Both transports use
+the same tool contracts, instructions, resource, workbook session, and tests.
 
 ### Workbook Domain
 
@@ -155,7 +161,8 @@ authorization.
 
 - Bind to `127.0.0.1`.
 - Open a user-selected workbook.
-- Serve the browser UI and Streamable HTTP MCP endpoint.
+- Serve the browser UI and Streamable HTTP MCP endpoint, or let a desktop host
+  launch the process over stdio.
 - Store changes back to the local file.
 
 ### Hosted

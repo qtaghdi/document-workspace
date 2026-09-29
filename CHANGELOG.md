@@ -44,6 +44,10 @@ and this project intends to follow Semantic Versioning when releases begin.
   collaboration tools using the official MCP Apps bridge.
 - Added separate browser and self-contained MCP App production bundles.
 - Added an in-memory MCP protocol test for the interactive tool and resource.
+- Added stdio MCP transport for local desktop hosts and a subprocess protocol
+  test that exercises workbook reads through the real transport boundary.
+- Added a host compatibility matrix and local Claude Desktop and Codex launch
+  configuration examples.
 
 ### Changed
 
@@ -55,6 +59,8 @@ and this project intends to follow Semantic Versioning when releases begin.
   reduced the self-contained MCP App bundle from 12.7 MB to about 7.8 MB.
 - Migrated JavaScript dependency management from npm to a pnpm workspace with a
   shared exact-version catalog for Univer packages.
+- Versioned the MCP App resource URI, added server usage instructions, declared
+  complete tool safety annotations, and added the OpenAI compatibility alias.
 
 ### Security
 

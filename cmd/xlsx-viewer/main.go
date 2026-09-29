@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"flag"
@@ -16,18 +17,23 @@ import (
 
 func main() {
 	file := flag.String("file", "", "path to the XLSX workbook to open")
+	transport := flag.String("transport", "http", "MCP transport: http or stdio")
 	addr := flag.String("addr", "127.0.0.1:8765", "HTTP listen address")
 	browserToken := flag.String("browser-token", "", "browser session token; generated when omitted")
 	mcpToken := flag.String("mcp-token", "", "MCP bearer token; generated when omitted")
 	flag.Parse()
 	if *file == "" {
-		fmt.Fprintln(os.Stderr, "usage: xlsx-viewer -file <workbook.xlsx> [-addr 127.0.0.1:8765]")
+		fmt.Fprintln(os.Stderr, "usage: xlsx-viewer -file <workbook.xlsx> [-transport http|stdio] [-addr 127.0.0.1:8765]")
 		os.Exit(2)
 	}
-	if *browserToken == "" {
+	if *transport != "http" && *transport != "stdio" {
+		fmt.Fprintf(os.Stderr, "unsupported transport %q: use http or stdio\n", *transport)
+		os.Exit(2)
+	}
+	if *transport == "http" && *browserToken == "" {
 		*browserToken = randomToken()
 	}
-	if *mcpToken == "" {
+	if *transport == "http" && *mcpToken == "" {
 		*mcpToken = randomToken()
 	}
 	session, err := workbook.Open(*file)
@@ -36,9 +42,17 @@ func main() {
 	}
 	defer session.Close()
 
+	api := httpapi.NewWithTokens(session, *browserToken, *mcpToken)
+	if *transport == "stdio" {
+		if err := api.RunStdio(context.Background()); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	server := &http.Server{
 		Addr:              *addr,
-		Handler:           httpapi.NewWithTokens(session, *browserToken, *mcpToken).Handler(),
+		Handler:           api.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
