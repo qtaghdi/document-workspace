@@ -1,4 +1,3 @@
-import type { ICellData, IWorkbookData } from '@univerjs/core';
 import { LocaleType, mergeLocales } from '@univerjs/core';
 import { UniverDocsPlugin } from '@univerjs/docs';
 import { UniverDocsUIPlugin } from '@univerjs/docs-ui';
@@ -25,7 +24,6 @@ import '@univerjs/ui/facade';
 
 import type {
   CellEdit,
-  CellInput,
   RangeEdit,
   SelectionChange,
   WorkbookEvent,
@@ -33,6 +31,14 @@ import type {
   WorkbookSnapshot,
   WorkbookOperation,
 } from './contracts';
+import { toA1Range } from './spreadsheet/a1';
+import { formatAfterCommand } from './spreadsheet/univer/command-mapper';
+import {
+  normalizeFormula,
+  toCellInput,
+  toUniverCellData,
+  toUniverWorkbook,
+} from './spreadsheet/univer/workbook-mapper';
 import type { SpreadsheetEngine } from './spreadsheet-engine';
 
 export class UniverSpreadsheetEngine implements SpreadsheetEngine {
@@ -268,176 +274,4 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
     this.univer.dispose();
   }
 
-}
-
-function toCellInput(cell: ICellData | null | undefined | void): CellInput {
-  if (!cell) {
-    return { value: null };
-  }
-  if (cell.f) {
-    return { formula: cell.f };
-  }
-  return { value: cell.v ?? null };
-}
-
-function toUniverCellData(value: unknown): ICellData {
-  if (value == null) {
-    return { v: null };
-  }
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return { v: value };
-  }
-  return { v: String(value) };
-}
-
-function toA1Range(startRow: number, startColumn: number, endRow: number, endColumn: number): string {
-  const start = `${columnName(startColumn)}${startRow + 1}`;
-  const end = `${columnName(endColumn)}${endRow + 1}`;
-  return start === end ? start : `${start}:${end}`;
-}
-
-function columnName(column: number): string {
-  let value = column + 1;
-  let name = '';
-  while (value > 0) {
-    value -= 1;
-    name = String.fromCharCode(65 + (value % 26)) + name;
-    value = Math.floor(value / 26);
-  }
-  return name;
-}
-
-function toUniverWorkbook(
-  snapshot: WorkbookSnapshot,
-  ranges: WorkbookRange[],
-): IWorkbookData {
-  const sheetOrder = snapshot.sheets.map((_, index) => `sheet-${index + 1}`);
-  const sheets = Object.fromEntries(
-    snapshot.sheets.map((name, index) => {
-      const range = ranges.find((candidate) => candidate.sheet === name);
-      const id = sheetOrder[index];
-      if (!id) {
-        throw new Error(`Missing worksheet ID for ${name}`);
-      }
-      return [
-        id,
-        {
-          id,
-          name,
-          rowCount: Math.max(200, range?.rows.length ?? 0),
-          columnCount: 50,
-          cellData: toCellData(range),
-          mergeData: toMergeData(range?.merges ?? []),
-        },
-      ];
-    }),
-  );
-
-  return {
-    id: snapshot.id,
-    name: snapshot.name,
-    appVersion: '1.0.2',
-    locale: LocaleType.EN_US,
-    sheetOrder,
-    sheets,
-    styles: {},
-  };
-}
-
-function toCellData(range: WorkbookRange | undefined): Record<number, Record<number, ICellData>> {
-  if (!range) {
-    return {};
-  }
-  return Object.fromEntries(
-    range.rows.map((row, rowIndex) => [
-      rowIndex,
-      Object.fromEntries(
-        row.map((cell, columnIndex) => {
-          const data: ICellData = cell.formula
-            ? { f: normalizeFormula(cell.formula) }
-            : { v: cell.value };
-          if (cell.style) {
-            data.s = {
-              bl: cell.style.bold ? 1 : undefined,
-              it: cell.style.italic ? 1 : undefined,
-              ff: cell.style.fontFamily || undefined,
-              fs: cell.style.fontSize || undefined,
-              cl: cell.style.fontColor ? { rgb: cell.style.fontColor } : undefined,
-              bg: cell.style.fillColor ? { rgb: cell.style.fillColor } : undefined,
-              n: cell.style.numberFormat ? { pattern: cell.style.numberFormat } : undefined,
-            };
-          }
-          return [columnIndex, data];
-        }),
-      ),
-    ]),
-  );
-}
-
-function toMergeData(merges: string[]): Array<{
-  startRow: number;
-  startColumn: number;
-  endRow: number;
-  endColumn: number;
-}> {
-  return merges.map((merge) => {
-    const [start, end = start] = merge.split(':');
-    const first = parseCellAddress(start ?? 'A1');
-    const last = parseCellAddress(end ?? start ?? 'A1');
-    return {
-      startRow: first.row,
-      startColumn: first.column,
-      endRow: last.row,
-      endColumn: last.column,
-    };
-  });
-}
-
-function parseCellAddress(address: string): { row: number; column: number } {
-  const match = /^([A-Z]+)([1-9][0-9]*)$/i.exec(address);
-  if (!match) {
-    throw new Error(`Invalid cell address ${address}`);
-  }
-  let column = 0;
-  for (const character of match[1]!.toUpperCase()) {
-    column = column * 26 + character.charCodeAt(0) - 64;
-  }
-  return { row: Number(match[2]) - 1, column: column - 1 };
-}
-
-function normalizeFormula(formula: string): string {
-  return formula.startsWith('=') ? formula : `=${formula}`;
-}
-
-function formatAfterCommand(
-  commandID: string,
-  range: {
-    getCellStyle(): {
-      bold: boolean;
-      italic: boolean;
-      fontFamily?: string | null | void;
-      fontSize?: number;
-      color?: { rgb?: string | null | void } | null | void;
-      background?: { rgb?: string | null | void } | null | void;
-      numberFormat?: { pattern: string } | null | void;
-    } | null;
-  },
-): import('./contracts').CellFormat | undefined {
-  const style = range.getCellStyle();
-  if (!style) return undefined;
-  switch (commandID) {
-    case 'sheet.command.set-bold': return { bold: style.bold };
-    case 'sheet.command.set-italic': return { italic: style.italic };
-    case 'sheet.command.set-font-family': return { fontFamily: style.fontFamily ?? '' };
-    case 'sheet.command.set-font-size': return { fontSize: style.fontSize ?? 11 };
-    case 'sheet.command.set-text-color':
-    case 'sheet.command.reset-text-color': return { fontColor: style.color?.rgb ?? '' };
-    case 'sheet.command.set-background-color':
-    case 'sheet.command.reset-background-color': return { fillColor: style.background?.rgb ?? '' };
-    default:
-      if (commandID.startsWith('sheet.command.numfmt.')) {
-        return { numberFormat: style.numberFormat?.pattern ?? '' };
-      }
-      return undefined;
-  }
 }

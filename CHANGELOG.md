@@ -48,6 +48,10 @@ and this project intends to follow Semantic Versioning when releases begin.
   test that exercises workbook reads through the real transport boundary.
 - Added a host compatibility matrix and local Claude Desktop and Codex launch
   configuration examples.
+- Added a repository-local architecture skill for coordinated Go, MCP, realtime,
+  TypeScript, and Univer changes.
+- Added runtime validation for workbook snapshots, ranges, operations responses,
+  and realtime events received by the browser.
 
 ### Changed
 
@@ -61,6 +65,18 @@ and this project intends to follow Semantic Versioning when releases begin.
   shared exact-version catalog for Univer packages.
 - Versioned the MCP App resource URI, added server usage instructions, declared
   complete tool safety annotations, and added the OpenAI compatibility alias.
+- Split browser orchestration, HTTP and MCP App transports, UI presentation,
+  workbook mapping, and Univer command mapping into focused TypeScript modules.
+- Split the Go HTTP adapter and workbook domain into focused files while
+  preserving routes, tool contracts, event ordering, revision semantics, and
+  atomic XLSX persistence.
+- Replaced loose frontend operation and event interfaces with discriminated
+  unions that encode required fields for each command and event type.
+
+### Fixed
+
+- Updated the browser revision after AI formatting and merge operations so the
+  next human edit does not submit a stale base revision.
 
 ### Security
 

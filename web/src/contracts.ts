@@ -22,15 +22,7 @@ export interface CellStyle {
   numberFormat?: string;
 }
 
-export interface CellFormat {
-  bold?: boolean;
-  italic?: boolean;
-  fontFamily?: string;
-  fontSize?: number;
-  fontColor?: string;
-  fillColor?: string;
-  numberFormat?: string;
-}
+export type CellFormat = CellStyle;
 
 export interface WorkbookRange {
   sheet: string;
@@ -39,15 +31,9 @@ export interface WorkbookRange {
   merges?: string[];
 }
 
-export interface WorkbookOperation {
-  type: 'set_cell' | 'set_formula' | 'paste_range' | 'set_format' | 'merge_cells' | 'unmerge_cells';
+interface CellOperation {
   sheet: string;
-  cell?: string;
-  range?: string;
-  value?: unknown;
-  formula?: string;
-  cells?: CellInput[][];
-  format?: CellFormat;
+  cell: string;
 }
 
 export interface CellInput {
@@ -59,19 +45,61 @@ export interface CellChange extends CellInput {
   cell: string;
 }
 
-export interface WorkbookEvent {
+interface RangeOperation {
+  sheet: string;
+  range: string;
+}
+
+export type WorkbookOperation =
+  | (CellOperation & { type: 'set_cell'; value: unknown })
+  | (CellOperation & { type: 'set_formula'; formula: string })
+  | (RangeOperation & { type: 'paste_range'; cells: CellInput[][] })
+  | (RangeOperation & { type: 'set_format'; format: CellFormat })
+  | (RangeOperation & { type: 'merge_cells' | 'unmerge_cells' });
+
+interface EventBase {
   sequence: number;
   revision: number;
-  actor: 'ai' | 'human' | string;
-  type: 'presence.update' | 'cell.typing' | 'cell.commit' | 'range.commit' | 'range.format' | 'range.merge_cells' | 'range.unmerge_cells' | string;
-  sheet?: string;
-  cell?: string;
-  range?: string;
-  text?: string;
-  state?: 'selecting' | 'editing' | 'idle' | string;
-  cells?: CellChange[];
-  format?: CellFormat;
+  actor: string;
 }
+
+export type WorkbookEvent =
+  | (EventBase & {
+      type: 'presence.update';
+      sheet: string;
+      range: string;
+      state?: 'selecting' | 'editing' | 'idle';
+    })
+  | (EventBase & {
+      type: 'cell.typing';
+      sheet: string;
+      cell: string;
+      text?: string;
+    })
+  | (EventBase & {
+      type: 'cell.commit';
+      sheet: string;
+      cell: string;
+      text?: string;
+      cells?: CellChange[];
+    })
+  | (EventBase & {
+      type: 'range.commit';
+      sheet: string;
+      range: string;
+      cells: CellChange[];
+    })
+  | (EventBase & {
+      type: 'range.format';
+      sheet: string;
+      range: string;
+      format: CellFormat;
+    })
+  | (EventBase & {
+      type: 'range.merge_cells' | 'range.unmerge_cells';
+      sheet: string;
+      range: string;
+    });
 
 export interface CellEdit {
   sheet: string;

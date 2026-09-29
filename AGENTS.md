@@ -155,6 +155,12 @@ Publish animation intent, then commit at cell or batch granularity.
 ## Frontend Conventions
 
 - Use TypeScript and keep editor-specific calls behind `SpreadsheetEngine`.
+- Keep `main.ts` limited to dependency composition and application startup.
+- Model operations and events as discriminated unions. Validate HTTP, MCP App,
+  and SSE payloads with Zod before they enter application state.
+- Keep HTTP and MCP App implementations behind the shared `WorkbookClient`
+  contract. Revision state, write serialization, and subscription ownership
+  belong in `WorkbookController`.
 - Use Tailwind CSS utilities for application-owned styling. Do not grow a
   monolithic handwritten stylesheet.
 - Keep the grid virtualized. Never render an entire large worksheet at once.

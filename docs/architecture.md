@@ -58,6 +58,14 @@ The workbook domain owns:
 - Ordered event publication.
 
 The package must remain independent of HTTP, MCP, and browser concerns.
+The package is organized by responsibility within that boundary:
+
+- `session.go` owns lifecycle and transactional batch application.
+- `operations.go` owns operation validation and XLSX mutation mapping.
+- `read.go` owns XLSX range, style, and merged-cell reads.
+- `persistence.go` owns same-directory atomic replacement and reload behavior.
+- `events.go` owns bounded event retention and subscriber delivery.
+- `types.go` owns the domain and wire contract structs.
 
 ### HTTP API
 
@@ -65,11 +73,22 @@ The HTTP API supports the standalone browser UI. It provides workbook metadata,
 range reads, human edit submission, and SSE events. Browser writes require a
 valid session cookie and a same-origin request.
 
+The adapter keeps routing and server construction in `server.go`, MCP tool and
+resource registration in `mcp.go`, browser handlers and SSE in `browser.go`,
+and authentication plus security headers in `middleware.go`.
+
 ### Browser UI
 
 The browser UI is a TypeScript application bundled with Vite. Univer is the
 selected spreadsheet engine for the current validation phase. Application
 styling uses Tailwind CSS, while Univer provides editor-specific styles.
+
+`main.ts` only composes dependencies. `WorkbookController` owns revision state,
+serialized writes, presence throttling, and subscription lifecycle. HTTP and
+MCP App transports implement one `WorkbookClient` contract, and all incoming
+payloads are checked with Zod before entering application state. `AppView` owns
+status and presence presentation. Pure A1, command, and workbook mapping code
+is separate from the stateful Univer lifecycle adapter.
 
 All editor-specific behavior is isolated behind `SpreadsheetEngine`. The
 adapter receives workbook snapshots, emits confirmed human cell edits, and

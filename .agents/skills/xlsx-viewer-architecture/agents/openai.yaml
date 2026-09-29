@@ -1,0 +1,3 @@
+interface:
+  display_name: "Xlsx Viewer Architecture"
+  short_description: "Safely evolve Go, MCP, realtime, and spreadsheet UI boundaries"
