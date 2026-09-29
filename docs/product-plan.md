@@ -82,8 +82,8 @@ are implemented. Live host UI certification remains.
 - Reduce the self-contained Univer bundle before broad host certification.
   Complete for the initial target, from 12.7 MB to approximately 7.8 MB.
 - Verify Claude Desktop and Codex host behavior and document any capability
-  differences. The repeatable matrix and local launch configurations are
-  documented. Manual UI certification remains.
+  differences. Codex stdio tools, writes, conflicts, and XLSX reopening are
+  certified. Codex embedded UI and the complete Claude Desktop path remain.
 - Show partial tool input as uncommitted ghost text only when the host supports
   it.
 
@@ -119,7 +119,8 @@ are implemented. Live host UI certification remains.
 1. Build the first XLSX compatibility corpus.
 2. Add row and column operations with undo and redo records.
 3. Add unsupported feature detection and save warnings.
-4. Complete manual MCP App UI certification in current Claude Desktop and Codex
-   host versions using the documented matrix.
+4. Complete manual MCP App UI certification in current Claude Desktop and
+   Codex host versions using the documented matrix. Codex tool-only
+   certification is complete.
 5. Continue measuring startup cost and remove additional plugins only when the
    editing workflow remains intact.

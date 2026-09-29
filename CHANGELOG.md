@@ -52,6 +52,8 @@ and this project intends to follow Semantic Versioning when releases begin.
   TypeScript, and Univer changes.
 - Added runtime validation for workbook snapshots, ranges, operations responses,
   and realtime events received by the browser.
+- Added a recorded Codex Desktop and CLI stdio certification covering workbook
+  reads, approved writes, revision conflicts, and XLSX reopening.
 
 ### Changed
 

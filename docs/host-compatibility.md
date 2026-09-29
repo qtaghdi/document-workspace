@@ -24,10 +24,42 @@ bound only to `127.0.0.1`.
 | Go subprocess over stdio | Passed | Passed | Resource readable | Workbook read passed | Automated |
 | Streamable HTTP with bearer token | Passed | Passed | Resource readable | API and tool tests passed | Automated |
 | Claude Desktop current release | Pending manual run | Pending manual run | Pending manual run | Pending manual run | Not certified |
-| Codex Desktop current release | Pending manual run | Pending manual run | Pending manual run | Pending manual run | Not certified |
+| Codex Desktop 26.924.22138 | Passed | Advertised, not surfaced by CLI | Not rendered | Tool writes passed, UI path pending | Tools certified, UI pending |
 
 Do not change a pending host row to passed without recording the application
 version, operating system, transport, workbook fixture, and observed result.
+
+## Certification Records
+
+### Codex Desktop and CLI, 2026-09-29
+
+- Host: Codex Desktop production release 26.924.22138, build 11645.
+- CLI: `codex-cli 0.145.0`, which shares the desktop `config.toml` MCP
+  configuration.
+- Operating system: macOS 26.5.1, build 25F80.
+- Transport: local stdio using the absolute release binary path.
+- Fixture: a disposable XLSX workbook containing a formula, style, merged
+  range, and list validation.
+- Read result: `get_workbook`, `read_range`, and `open_workbook` completed
+  successfully with structured content.
+- Safety result: Codex recognized the destructive tool annotation and required
+  approval before `apply_operations`.
+- Write result: an approved cell write advanced revision 1 to revision 2 once.
+  A second write using revision 1 was rejected, and no partial cell change was
+  persisted.
+- Reopen result: Excel-compatible package reopening preserved the committed
+  value, formula, style, merge, and validation.
+- UI result: the Codex CLI returned the `open_workbook` structured result but
+  did not render the MCP App resource. The current OpenAI UI documentation
+  describes iframe rendering in ChatGPT and portable behavior in compatible MCP
+  Apps hosts, but does not establish Codex Desktop iframe support. Keep the
+  Codex embedded UI row pending until it is visibly rendered and edited in the
+  desktop host.
+
+References:
+
+- [OpenAI MCP server and UI quickstart](https://developers.openai.com/plugins/build/app-quickstart)
+- [OpenAI MCP App UI guidance](https://developers.openai.com/plugins/build/chatgpt-ui)
 
 ## Build the Local Host Binary
 
