@@ -1,5 +1,5 @@
 # Frontend dependencies and local caches
-web/node_modules/
+node_modules/
 web/.vite/
 internal/httpapi/static/assets/
 internal/httpapi/static/app.html

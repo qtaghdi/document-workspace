@@ -1,11 +1,8 @@
 import { readFile } from 'node:fs/promises';
 
-const lockURL = new URL('../package-lock.json', import.meta.url);
-const lock = JSON.parse(await readFile(lockURL, 'utf8'));
-const packagePaths = Object.keys(lock.packages ?? {});
-const prohibited = packagePaths.filter((path) =>
-  path.includes('node_modules/@univerjs-pro/'),
-);
+const lockURL = new URL('../../pnpm-lock.yaml', import.meta.url);
+const lock = await readFile(lockURL, 'utf8');
+const prohibited = lock.match(/@univerjs-pro\/[a-z0-9_-]+/gi) ?? [];
 
 if (prohibited.length > 0) {
   console.error('Univer Pro packages are not allowed in this repository:');

@@ -86,6 +86,12 @@ as one HTML resource and uses the official postMessage bridge plus bounded
 event polling. Both entries call the same Go workbook domain and operation
 contracts.
 
+The Univer integration registers required plugins explicitly instead of using
+the complete sheets preset. The MCP App build retains English hyphenation data
+and removes unused language dictionaries from Univer's renderer. This keeps the
+self-contained resource below 8 MB without changing the standalone browser
+build or loading runtime code from a CDN.
+
 See [`adr/0001-spreadsheet-engine.md`](adr/0001-spreadsheet-engine.md) for the
 engine comparison and decision.
 
@@ -164,9 +170,8 @@ authorization.
 
 - Extended Excelize-to-Univer mappings for validation, conditional formatting,
   charts, images, and unsupported feature warnings.
-- Preset versus plugin mode and the production JavaScript startup budget. The
-  self-contained MCP App bundle is currently large and must be reduced before
-  broad host certification.
+- Further production JavaScript startup reductions beyond the current plugin
+  mode and locale pruning.
 - Formula calculation strategy.
 - Unsupported XLSX feature detection strategy.
 - Operation log persistence format.

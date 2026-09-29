@@ -78,12 +78,18 @@ make verify
 make build
 ```
 
+JavaScript dependencies are managed with pnpm 11.9. The root workspace catalog
+pins every Univer package to one exact version and the lockfile records the
+complete frontend dependency graph. The root Makefile is the preferred entry
+point for contributors who do not need package-level commands.
+
 The browser application uses plain TypeScript, Univer, Vite, and Tailwind CSS.
 The production build is written to `internal/httpapi/static` and embedded in the
 Go binary. Vite emits a code-split standalone browser build and a self-contained
 `app.html` for MCP App hosts. Generated assets and `app.html` are ignored by
 Git. Use `make build`, rather than a standalone `go build`, when producing a
-release binary. React is not required.
+release binary. The MCP App build removes unused non-English hyphenation data
+and is approximately 7.8 MB before transport compression. React is not required.
 
 Run a workbook locally:
 

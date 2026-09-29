@@ -70,9 +70,9 @@ Exit criteria:
 
 ## Phase 3: MCP App Packaging
 
-Status: in progress. The resource, tool metadata, dual transport adapter, and
-protocol integration test are implemented. Live host certification and bundle
-size reduction remain.
+Status: in progress. The resource, tool metadata, dual transport adapter,
+protocol integration test, and first bundle reduction are implemented. Live
+host certification remains.
 
 - Register an MCP App UI resource. Complete.
 - Associate UI metadata only with tools that need the spreadsheet surface.
@@ -80,6 +80,7 @@ size reduction remain.
 - Use the official MCP App postMessage bridge inside an embedded host. Complete.
 - Keep ordinary workbook tools available when UI is unavailable. Complete.
 - Reduce the self-contained Univer bundle before broad host certification.
+  Complete for the initial target, from 12.7 MB to approximately 7.8 MB.
 - Verify Claude Desktop and Codex host behavior and document any capability
   differences.
 - Show partial tool input as uncommitted ghost text only when the host supports
@@ -118,5 +119,5 @@ size reduction remain.
 2. Add row and column operations with undo and redo records.
 3. Add unsupported feature detection and save warnings.
 4. Verify the MCP App in supported Claude Desktop and Codex host versions.
-5. Replace preset mode with a measured plugin-mode bundle if it reduces startup
-   cost without losing required behavior.
+5. Continue measuring startup cost and remove additional plugins only when the
+   editing workflow remains intact.

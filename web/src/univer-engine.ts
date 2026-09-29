@@ -1,7 +1,27 @@
-import type { ICellData, IWorkbookData } from '@univerjs/presets';
-import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets';
-import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core';
+import type { ICellData, IWorkbookData } from '@univerjs/core';
+import { LocaleType, mergeLocales } from '@univerjs/core';
+import { UniverDocsPlugin } from '@univerjs/docs';
+import { UniverDocsUIPlugin } from '@univerjs/docs-ui';
+import { UniverFormulaEnginePlugin } from '@univerjs/engine-formula';
+import { UniverRenderEnginePlugin } from '@univerjs/engine-render';
+import { createUniver } from '@univerjs/presets';
+import { UniverSheetsPlugin } from '@univerjs/sheets';
+import { UniverSheetsFormulaPlugin } from '@univerjs/sheets-formula';
+import { UniverSheetsFormulaUIPlugin } from '@univerjs/sheets-formula-ui';
+import { UniverSheetsNumfmtPlugin } from '@univerjs/sheets-numfmt';
+import { UniverSheetsNumfmtUIPlugin } from '@univerjs/sheets-numfmt-ui';
+import { UniverSheetsUIPlugin } from '@univerjs/sheets-ui';
+import { UniverUIPlugin } from '@univerjs/ui';
 import UniverPresetSheetsCoreEnUS from '@univerjs/preset-sheets-core/locales/en-US';
+
+import '@univerjs/docs-ui/facade';
+import '@univerjs/engine-formula/facade';
+import '@univerjs/sheets/facade';
+import '@univerjs/sheets-formula/facade';
+import '@univerjs/sheets-formula-ui/facade';
+import '@univerjs/sheets-numfmt/facade';
+import '@univerjs/sheets-ui/facade';
+import '@univerjs/ui/facade';
 
 import type {
   CellEdit,
@@ -33,11 +53,19 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
       locales: {
         [LocaleType.EN_US]: mergeLocales(UniverPresetSheetsCoreEnUS),
       },
-      presets: [
-        UniverSheetsCorePreset({
-          container,
-          ribbonType: 'simple',
-        }),
+      presets: [],
+      plugins: [
+        UniverDocsPlugin,
+        UniverRenderEnginePlugin,
+        [UniverUIPlugin, { container, ribbonType: 'simple' }],
+        UniverDocsUIPlugin,
+        UniverFormulaEnginePlugin,
+        UniverSheetsPlugin,
+        UniverSheetsUIPlugin,
+        UniverSheetsNumfmtPlugin,
+        UniverSheetsNumfmtUIPlugin,
+        UniverSheetsFormulaPlugin,
+        UniverSheetsFormulaUIPlugin,
       ],
     });
     this.univer = univer;

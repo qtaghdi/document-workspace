@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "npm run check:oss && tsc --noEmit && vite build && vite build --config vite.app.config.ts",
+    "build": "pnpm run check:oss && tsc --noEmit && vite build && vite build --config vite.app.config.ts",
     "check:oss": "node ./scripts/check-oss-only.mjs",
     "dev": "vite",
     "typecheck": "tsc --noEmit"
@@ -12,8 +12,21 @@
   "dependencies": {
     "@modelcontextprotocol/client": "^2.2.0",
     "@modelcontextprotocol/ext-apps": "^2.0.3",
-    "@univerjs/preset-sheets-core": "^1.0.2",
-    "@univerjs/presets": "^1.0.2",
+    "@univerjs/core": "catalog:",
+    "@univerjs/design": "catalog:",
+    "@univerjs/docs": "catalog:",
+    "@univerjs/docs-ui": "catalog:",
+    "@univerjs/engine-formula": "catalog:",
+    "@univerjs/engine-render": "catalog:",
+    "@univerjs/preset-sheets-core": "catalog:",
+    "@univerjs/presets": "catalog:",
+    "@univerjs/sheets": "catalog:",
+    "@univerjs/sheets-formula": "catalog:",
+    "@univerjs/sheets-formula-ui": "catalog:",
+    "@univerjs/sheets-numfmt": "catalog:",
+    "@univerjs/sheets-numfmt-ui": "catalog:",
+    "@univerjs/sheets-ui": "catalog:",
+    "@univerjs/ui": "catalog:",
     "zod": "^4.6.5"
   },
   "devDependencies": {

@@ -5,13 +5,14 @@ GO_CACHE ?= /tmp/xlsx-viewer-go-cache
 .PHONY: audit build dev go-build go-test test verify web-build web-install web-test
 
 web-install:
-	cd web && npm install
+	pnpm install --frozen-lockfile
 
 web-test:
-	cd web && npm run check:oss && npm run typecheck
+	pnpm --dir web run check:oss
+	pnpm --dir web run typecheck
 
 web-build:
-	cd web && npm run build
+	pnpm --dir web run build
 
 go-test:
 	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOCACHE=$(GO_CACHE) $(GO) test ./...
@@ -30,7 +31,7 @@ verify: web-build
 build: web-build go-build
 
 audit:
-	cd web && npm audit --omit=dev
+	pnpm audit --prod
 
 dev:
 	@test -n "$(FILE)" || (echo "Usage: make dev FILE=/absolute/path/to/book.xlsx" && exit 2)

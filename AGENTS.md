@@ -60,6 +60,8 @@ boundary or adding infrastructure.
   depend on Univer Pro services without an explicit repository owner decision.
 - Vite for browser bundling and Tailwind CSS for application shell styling.
   React is not required by the application architecture.
+- pnpm 11.9 is the JavaScript package manager. Use the workspace catalog to
+  keep all Univer packages on one exact version. Do not add npm or Bun lockfiles.
 - SSE for server-to-UI edit events. Add WebSocket only when bidirectional
   presence or latency requirements justify the operational cost.
 - A relational database for identities, workbook metadata, and revision
@@ -166,6 +168,7 @@ Publish animation intent, then commit at cell or batch granularity.
 - Keep all Univer packages on the same version and audit production
   dependencies after an upgrade.
 - Run the OSS dependency check whenever frontend dependencies change.
+- Run frontend scripts through pnpm or the root Makefile.
 - Test current desktop, a small laptop viewport, and a mobile fallback.
 
 ## Comments and Documentation

@@ -51,6 +51,10 @@ and this project intends to follow Semantic Versioning when releases begin.
   workbook and collaboration service.
 - Replaced the planned Univer Pro evaluation with an OSS-only presence and XLSX
   integration strategy owned by this repository.
+- Replaced the Univer sheets preset with explicit OSS plugin registration and
+  reduced the self-contained MCP App bundle from 12.7 MB to about 7.8 MB.
+- Migrated JavaScript dependency management from npm to a pnpm workspace with a
+  shared exact-version catalog for Univer packages.
 
 ### Security
 
