@@ -54,6 +54,8 @@ and this project intends to follow Semantic Versioning when releases begin.
   and realtime events received by the browser.
 - Added a recorded Codex Desktop and CLI stdio certification covering workbook
   reads, approved writes, revision conflicts, and XLSX reopening.
+- Added a recorded Claude Desktop and Code stdio certification covering tool
+  reads, one-time approvals, writes, revision conflicts, and XLSX reopening.
 
 ### Changed
 
@@ -74,6 +76,8 @@ and this project intends to follow Semantic Versioning when releases begin.
   atomic XLSX persistence.
 - Replaced loose frontend operation and event interfaces with discriminated
   unions that encode required fields for each command and event type.
+- Documented host-owned manual, automatic, one-time, and persistent approval
+  behavior for workbook MCP tools.
 
 ### Fixed
 

@@ -23,13 +23,38 @@ bound only to `127.0.0.1`.
 | Go in-memory client | Passed | Passed | Bundle inspected | Passed through tool calls | Automated |
 | Go subprocess over stdio | Passed | Passed | Resource readable | Workbook read passed | Automated |
 | Streamable HTTP with bearer token | Passed | Passed | Resource readable | API and tool tests passed | Automated |
-| Claude Desktop current release | Pending manual run | Pending manual run | Pending manual run | Pending manual run | Not certified |
+| Claude Desktop 2.7032.0 with Code 2.1.280 | Passed | Advertised, not rendered | Not rendered | Tool writes passed, UI path pending | Tools certified, UI pending |
 | Codex Desktop 26.924.22138 | Passed | Advertised, not surfaced by CLI | Not rendered | Tool writes passed, UI path pending | Tools certified, UI pending |
 
 Do not change a pending host row to passed without recording the application
 version, operating system, transport, workbook fixture, and observed result.
 
 ## Certification Records
+
+### Claude Desktop and Code, 2026-09-30
+
+- Host: Claude Desktop 2.7032.0 with its integrated Claude Code 2.1.280 local
+  session.
+- Operating system: macOS 26.5.1, build 25F80.
+- Transport: local stdio using a project-scoped temporary MCP configuration
+  and the absolute release binary path.
+- Fixture: a disposable XLSX workbook containing a formula, style, merged
+  range, and list validation.
+- Read result: `get_workbook` and `read_range` completed successfully and
+  returned workbook metadata, formulas, styles, and merged-cell data.
+- Permission result: Claude Desktop Auto mode allowed the host to decide tool
+  execution. Manual mode displayed Deny, Always allow, and Allow once for both
+  read and write tool calls. Certification selected Allow once only. No
+  persistent allow rule was created.
+- Write result: approved writes advanced revisions 1 to 2 and 2 to 3. A write
+  using stale revision 2 was rejected with the expected revision 3 conflict,
+  and the rejected value was not persisted.
+- Reopen result: Excel-compatible package reopening preserved both committed
+  values, the formula, style, merge, and validation. The rejected cell remained
+  empty.
+- UI result: `open_workbook` returned structured workbook metadata, but Claude
+  Desktop Code did not render the MCP App resource in this run. Keep embedded
+  UI and direct UI editing pending until the spreadsheet is visibly rendered.
 
 ### Codex Desktop and CLI, 2026-09-29
 
@@ -108,6 +133,25 @@ args = ["-transport", "stdio", "-file", "/absolute/path/to/workbook.xlsx"]
 
 Start a new Codex session after changing MCP configuration. Existing sessions
 may keep their previously discovered tool list.
+
+## Host Approval Modes
+
+The MCP server classifies workbook reads as read-only, presence updates as
+non-destructive, and workbook writes as destructive. These annotations give a
+host the information it needs to choose an approval policy. They do not grant
+permission and cannot force a host to display a particular button.
+
+For normal workbook editing, prefer the host's manual approval mode and choose
+Allow once after reviewing the complete operation batch. Always allow is a
+host-side persistent rule for the selected tool or scope. Use it only when the
+workbook, server command, and future operation scope are all trusted. Auto mode
+lets the host decide whether each call needs confirmation and can execute a
+write without showing a prompt.
+
+An approval applies only to the operation request that was shown. The server
+still validates the base revision, complete batch, workbook limits, and atomic
+persistence after approval. A revision conflict requires a refreshed proposal
+instead of reusing an older approved write.
 
 ## Manual Certification Procedure
 
