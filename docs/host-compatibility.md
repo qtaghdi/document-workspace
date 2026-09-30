@@ -24,7 +24,7 @@ Claude and ChatGPT connectors cannot reach a server bound only to `127.0.0.1`.
 | Go subprocess over stdio | Passed | Passed | Resource readable | Real listener passed | Workbook read passed | Automated |
 | Streamable HTTP with bearer token | Passed | Passed | Resource readable | Not applicable | API and tool tests passed | Automated |
 | Claude Desktop 2.7032.0 with Code 2.1.280 | Passed | Advertised, not rendered | Not rendered | Pending | Tool writes passed, UI path pending | Tools certified, UI pending |
-| Codex Desktop 26.924.22138 | Passed | Advertised, not surfaced by CLI | Not rendered | Passed in Browser panel | Tool writes passed, browser edits pending | Tools and browser fallback certified |
+| Codex Desktop 26.924.22138 | Passed | Advertised, not surfaced by CLI | Not rendered | Passed in Browser panel | Human and AI edits passed | Tools and browser fallback certified |
 
 Do not change a pending host row to passed without recording the application
 version, operating system, transport, workbook fixture, and observed result.
@@ -94,9 +94,16 @@ version, operating system, transport, workbook fixture, and observed result.
 - Render result: the Browser panel visibly rendered the workbook name, revision
   1, the worksheet tab, the value `Browser fallback` in A1, and the value
   `Live workbook session` in B2.
-- Scope: this certifies launch and rendering through the loopback browser
-  fallback. Native MCP App rendering and browser-originated edit persistence
-  remain separate pending checks.
+- Human edit result: a direct Browser panel edit wrote `Human committed` to F15
+  and advanced the shared session from revision 1 to revision 2.
+- AI edit result: `update_presence` selected C3, then `apply_operations` wrote
+  `AI committed`. The Browser panel displayed the new value and reported
+  `AI change saved` at revision 3.
+- Reopen result: reopening the XLSX package after the stdio process exited
+  preserved both the human value in F15 and the AI value in C3.
+- Scope: this certifies launch, rendering, browser-originated persistence, MCP
+  presence, and committed AI event synchronization through the loopback browser
+  fallback. Native MCP App rendering remains a separate pending check.
 
 References:
 

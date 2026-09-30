@@ -378,3 +378,130 @@ func TestBrowserAndMCPUseSeparateTokens(t *testing.T) {
 		t.Fatal("MCP token was rejected")
 	}
 }
+
+func TestBrowserAndMCPShareRevisionedWorkbookSession(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "book.xlsx")
+	file := excelize.NewFile()
+	if err := file.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	session, err := workbook.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	api := NewWithTokens(session, "browser-token", "mcp-token")
+
+	humanWrite := httptest.NewRecorder()
+	humanRequest := httptest.NewRequest(http.MethodPost, "/api/operations", bytes.NewBufferString(`{
+		"baseRevision": 1,
+		"operations": [{"type":"set_cell","sheet":"Sheet1","cell":"F15","value":"Human committed"}]
+	}`))
+	humanRequest.Header.Set("Content-Type", "application/json")
+	humanRequest.Header.Set("Origin", "http://example.com")
+	humanRequest.Host = "example.com"
+	humanRequest.AddCookie(&http.Cookie{Name: "xlsx_session", Value: "browser-token"})
+	api.Handler().ServeHTTP(humanWrite, humanRequest)
+	if humanWrite.Code != http.StatusOK {
+		t.Fatalf("browser write = %d, want %d: %s", humanWrite.Code, http.StatusOK, humanWrite.Body.String())
+	}
+	var humanResponse applyResponse
+	if err := json.NewDecoder(humanWrite.Body).Decode(&humanResponse); err != nil {
+		t.Fatal(err)
+	}
+	if humanResponse.Workbook.Revision != 2 {
+		t.Fatalf("browser revision = %d, want 2", humanResponse.Workbook.Revision)
+	}
+
+	mcpServer := api.mcpServer()
+	client := mcp.NewClient(&mcp.Implementation{Name: "collaboration-test", Version: "0.1.0"}, nil)
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := mcpServer.Connect(context.Background(), serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	clientSession, err := client.Connect(context.Background(), clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	if _, err := clientSession.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "update_presence",
+		Arguments: map[string]any{
+			"sheet": "Sheet1",
+			"range": "C3",
+			"state": "editing",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	aiWrite, err := clientSession.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "apply_operations",
+		Arguments: map[string]any{
+			"baseRevision": float64(2),
+			"operations": []map[string]any{{
+				"type":  "set_cell",
+				"sheet": "Sheet1",
+				"cell":  "C3",
+				"value": "AI committed",
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	encodedAIWrite, err := json.Marshal(aiWrite.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var aiResponse applyResponse
+	if err := json.Unmarshal(encodedAIWrite, &aiResponse); err != nil {
+		t.Fatal(err)
+	}
+	if aiResponse.Workbook.Revision != 3 {
+		t.Fatalf("AI revision = %d, want 3", aiResponse.Workbook.Revision)
+	}
+
+	events, snapshot := session.EventsAfter(0)
+	if snapshot.Revision != 3 {
+		t.Fatalf("shared session revision = %d, want 3", snapshot.Revision)
+	}
+	if len(events) != 7 {
+		t.Fatalf("event count = %d, want 7: %#v", len(events), events)
+	}
+	for index, event := range events {
+		if event.Sequence != uint64(index+1) {
+			t.Fatalf("event %d sequence = %d, want %d", index, event.Sequence, index+1)
+		}
+	}
+	if events[0].Actor != "human" || events[0].Type != "presence.update" || events[2].Type != "cell.commit" || events[2].Revision != 2 {
+		t.Fatalf("human events = %#v", events[:3])
+	}
+	if events[3].Actor != "ai" || events[3].Type != "presence.update" || events[3].Revision != 2 {
+		t.Fatalf("AI presence event = %#v", events[3])
+	}
+	if events[4].Actor != "ai" || events[4].Type != "presence.update" || events[6].Type != "cell.commit" || events[6].Revision != 3 {
+		t.Fatalf("AI write events = %#v", events[4:])
+	}
+
+	reopened, err := excelize.OpenFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	for cell, want := range map[string]string{"F15": "Human committed", "C3": "AI committed"} {
+		got, err := reopened.GetCellValue("Sheet1", cell)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Fatalf("%s = %q, want %q", cell, got, want)
+		}
+	}
+}

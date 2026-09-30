@@ -86,8 +86,9 @@ are implemented. Live host UI certification remains.
 - Verify Claude Desktop and Codex host behavior and document any capability
   differences. Claude Desktop Code and Codex stdio tools, approved writes,
   conflicts, and XLSX reopening are certified. The Codex loopback browser
-  fallback is also certified for launch and rendering. Embedded UI remains
-  pending in both tested host paths.
+  fallback is also certified for launch, rendering, human writes, AI presence,
+  AI commits, and XLSX reopening. Embedded UI remains pending in both tested
+  host paths.
 - Show partial tool input as uncommitted ghost text only when the host supports
   it.
 
@@ -123,8 +124,8 @@ are implemented. Live host UI certification remains.
 1. Build the first XLSX compatibility corpus.
 2. Add row and column operations with undo and redo records.
 3. Add unsupported feature detection and save warnings.
-4. Certify the loopback browser fallback in the current Claude Desktop browser
-   panel, then verify browser-originated edits in both hosts. Native embedded
-   MCP App rendering remains pending.
+4. Certify the loopback browser fallback and browser-originated edits in the
+   current Claude Desktop browser panel. Native embedded MCP App rendering
+   remains pending in both hosts.
 5. Continue measuring startup cost and remove additional plugins only when the
    editing workflow remains intact.

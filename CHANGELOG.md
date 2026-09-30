@@ -58,8 +58,10 @@ and this project intends to follow Semantic Versioning when releases begin.
   reads, one-time approvals, writes, revision conflicts, and XLSX reopening.
 - Added a stdio browser fallback that lets desktop hosts without MCP App
   rendering open the same workbook session in a local browser panel.
-- Added a recorded Codex Browser panel certification for the stdio loopback
-  fallback launch and workbook rendering path.
+- Added a recorded Codex Browser panel certification for stdio fallback launch,
+  human editing, AI presence and commits, and XLSX reopening.
+- Added an integration test proving that browser and MCP edits share one
+  revision sequence, ordered event log, and persisted XLSX file.
 
 ### Changed
 
