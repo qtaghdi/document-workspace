@@ -42,8 +42,9 @@ Exit criteria:
 ## Phase 2: Spreadsheet Editing Experience
 
 Status: in progress. Range paste, basic styles, merged cells, presence, and
-reconnect replay are implemented. Broader structural edits and compatibility
-coverage remain.
+reconnect replay are implemented. The first generated XLSX compatibility corpus
+fixture is covered by an automated unrelated-edit round-trip test. Broader
+structural edits and producer-specific compatibility coverage remain.
 
 - Integrate Univer behind a replaceable `SpreadsheetEngine` boundary.
 - Bundle the TypeScript application with Vite and style the application shell
@@ -121,7 +122,8 @@ are implemented. Live host UI certification remains.
 
 ## Immediate Next Work
 
-1. Build the first XLSX compatibility corpus.
+1. Add Microsoft Excel and LibreOffice fixtures to the XLSX compatibility
+   corpus.
 2. Add row and column operations with undo and redo records.
 3. Add unsupported feature detection and save warnings.
 4. Certify the loopback browser fallback and browser-originated edits in the

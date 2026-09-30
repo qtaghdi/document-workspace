@@ -62,6 +62,11 @@ and this project intends to follow Semantic Versioning when releases begin.
   human editing, AI presence and commits, and XLSX reopening.
 - Added an integration test proving that browser and MCP edits share one
   revision sequence, ordered event log, and persisted XLSX file.
+- Added the first XLSX compatibility corpus fixture and an automated unrelated
+  edit round-trip test for formulas, styles, merges, validation, conditional
+  formatting, drawings, links, names, and comments.
+- Added a repository-local `xlsx-compatibility-qa` skill for safe corpus-based
+  workbook compatibility verification.
 
 ### Changed
 

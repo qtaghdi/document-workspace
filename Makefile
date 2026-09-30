@@ -2,7 +2,7 @@ GO ?= go
 GO_TOOLCHAIN ?= go1.25.0
 GO_CACHE ?= /tmp/xlsx-viewer-go-cache
 
-.PHONY: audit build dev go-build go-test test verify web-build web-install web-test
+.PHONY: audit build compatibility-test dev go-build go-test test verify web-build web-install web-test
 
 web-install:
 	pnpm install --frozen-lockfile
@@ -16,6 +16,9 @@ web-build:
 
 go-test:
 	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOCACHE=$(GO_CACHE) $(GO) test ./...
+
+compatibility-test:
+	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOCACHE=$(GO_CACHE) $(GO) test ./internal/workbook -run CompatibilityCorpus -count=1
 
 go-build:
 	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOCACHE=$(GO_CACHE) $(GO) build -o bin/xlsx-viewer ./cmd/xlsx-viewer

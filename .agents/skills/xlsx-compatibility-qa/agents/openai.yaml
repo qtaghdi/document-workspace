@@ -1,0 +1,4 @@
+interface:
+  display_name: "XLSX Compatibility QA"
+  short_description: "Verify workbook features survive safe round trips"
+  default_prompt: "Use $xlsx-compatibility-qa to verify workbook compatibility before changing persistence."

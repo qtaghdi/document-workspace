@@ -148,6 +148,14 @@ The service serializes the workbook to a temporary file in the same directory,
 flushes it, closes it, and atomically replaces the original path. Using the same
 directory avoids cross-filesystem rename behavior.
 
+Compatibility tests copy committed fixtures from `testdata/compatibility` to a
+temporary directory, inventory unrelated workbook features, apply an edit
+through `workbook.Session`, then reopen and compare the saved package. The first
+fixture is an Excelize-generated baseline covering formulas, styles, merges,
+validation, conditional formatting, drawings, links, names, and comments.
+Producer-specific Excel and LibreOffice fixtures remain required before making
+broader fidelity claims.
+
 Hosted storage will preserve immutable workbook versions in object storage and
 keep the active revision pointer in a relational database.
 

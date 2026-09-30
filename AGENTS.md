@@ -225,9 +225,14 @@ when at least one of these conditions is true:
 Do not create speculative skills for one-off tasks. For a one-off workflow,
 follow this guide and record durable decisions in `docs` instead.
 
+Current repository skills include:
+
+- `xlsx-viewer-architecture` for changes spanning Go, MCP, realtime, and the
+  browser spreadsheet boundary.
+- `xlsx-compatibility-qa` for workbook corpus verification.
+
 Likely future skills include:
 
-- `xlsx-compatibility-qa` for workbook corpus verification.
 - `mcp-app-release` for capability, packaging, and release checks.
 - `spreadsheet-ui-fidelity` for browser interaction and visual verification.
 
