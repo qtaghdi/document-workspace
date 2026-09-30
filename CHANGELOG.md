@@ -56,6 +56,10 @@ and this project intends to follow Semantic Versioning when releases begin.
   reads, approved writes, revision conflicts, and XLSX reopening.
 - Added a recorded Claude Desktop and Code stdio certification covering tool
   reads, one-time approvals, writes, revision conflicts, and XLSX reopening.
+- Added a stdio browser fallback that lets desktop hosts without MCP App
+  rendering open the same workbook session in a local browser panel.
+- Added a recorded Codex Browser panel certification for the stdio loopback
+  fallback launch and workbook rendering path.
 
 ### Changed
 
@@ -92,6 +96,8 @@ and this project intends to follow Semantic Versioning when releases begin.
   Univer while keeping scripts restricted to same-origin assets.
 - Added random session tokens, strict session cookies, browser Origin checks,
   request body limits, range size limits, and baseline security headers.
+- Protected stdio browser fallback links with single-use two-minute launch
+  tokens, loopback-only binding, and a bounded outstanding-token set.
 
 ## 0.0.1 - 2026-09-28
 

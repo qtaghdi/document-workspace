@@ -43,12 +43,19 @@ browser URL exactly as printed. MCP clients should connect to
 Bearer token.
 
 Local desktop hosts can launch the same binary over stdio. This mode keeps all
-workbook access on the machine and does not require a listening port:
+workbook access on the machine. It also starts an ephemeral loopback browser
+listener so a host without MCP App rendering can open the spreadsheet UI:
 
 ```bash
 make build
 ./bin/xlsx-viewer -transport stdio -file /absolute/path/to/workbook.xlsx
 ```
+
+`open_workbook` returns a `browserUrl` when this fallback is active. The link is
+valid once for two minutes, exchanges itself for an HTTP-only session cookie,
+and is intended for the host's browser panel. Disable the listener with
+`-stdio-browser=false`, or select another loopback address with
+`-stdio-browser-addr 127.0.0.1:0`. Non-loopback addresses are rejected.
 
 The host must launch the command and communicate over stdin and stdout. See
 [`docs/host-compatibility.md`](docs/host-compatibility.md) for Claude Desktop
@@ -56,7 +63,8 @@ and Codex configuration examples and the current certification matrix.
 
 Available MCP tools:
 
-- `open_workbook`, which requests the interactive MCP App surface;
+- `open_workbook`, which requests the interactive MCP App surface and returns a
+  short-lived local browser fallback when needed;
 - `get_workbook`
 - `read_range`
 - `apply_operations`

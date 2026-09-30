@@ -79,12 +79,15 @@ are implemented. Live host UI certification remains.
   Complete.
 - Use the official MCP App postMessage bridge inside an embedded host. Complete.
 - Keep ordinary workbook tools available when UI is unavailable. Complete.
+- Serve an authenticated loopback browser fallback from stdio sessions and
+  return a single-use launch URL from `open_workbook`. Complete.
 - Reduce the self-contained Univer bundle before broad host certification.
   Complete for the initial target, from 12.7 MB to approximately 7.8 MB.
 - Verify Claude Desktop and Codex host behavior and document any capability
   differences. Claude Desktop Code and Codex stdio tools, approved writes,
-  conflicts, and XLSX reopening are certified. Embedded UI remains pending in
-  both tested host paths.
+  conflicts, and XLSX reopening are certified. The Codex loopback browser
+  fallback is also certified for launch and rendering. Embedded UI remains
+  pending in both tested host paths.
 - Show partial tool input as uncommitted ghost text only when the host supports
   it.
 
@@ -120,8 +123,8 @@ are implemented. Live host UI certification remains.
 1. Build the first XLSX compatibility corpus.
 2. Add row and column operations with undo and redo records.
 3. Add unsupported feature detection and save warnings.
-4. Complete manual MCP App UI certification in current Claude Desktop and
-   Codex host versions using the documented matrix. Tool-only certification is
-   complete for both hosts.
+4. Certify the loopback browser fallback in the current Claude Desktop browser
+   panel, then verify browser-originated edits in both hosts. Native embedded
+   MCP App rendering remains pending.
 5. Continue measuring startup cost and remove additional plugins only when the
    editing workflow remains intact.

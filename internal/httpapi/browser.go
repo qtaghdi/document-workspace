@@ -28,7 +28,7 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid session token", http.StatusUnauthorized)
 			return
 		}
-		http.SetCookie(w, &http.Cookie{Name: "xlsx_session", Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: 12 * 60 * 60})
+		s.setBrowserSessionCookie(w)
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -43,6 +43,33 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(body)
+}
+
+func (s *Server) launchBrowserSession(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	s.launchMu.Lock()
+	expiresAt, ok := s.launchTokens[token]
+	if ok {
+		delete(s.launchTokens, token)
+	}
+	s.launchMu.Unlock()
+	if !ok || !expiresAt.After(time.Now()) {
+		http.Error(w, "invalid or expired launch link", http.StatusUnauthorized)
+		return
+	}
+	s.setBrowserSessionCookie(w)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) setBrowserSessionCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "xlsx_session",
+		Value:    s.browserToken,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   12 * 60 * 60,
+	})
 }
 
 func (s *Server) updatePresence(w http.ResponseWriter, r *http.Request) {

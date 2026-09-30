@@ -43,8 +43,17 @@ remain available when a client does not render MCP Apps.
 
 The same MCP server supports Streamable HTTP and stdio. HTTP is the default for
 the standalone browser and future hosted deployment. Stdio lets local desktop
-hosts launch the Go binary without opening a network port. Both transports use
-the same tool contracts, instructions, resource, workbook session, and tests.
+hosts launch the Go binary. In stdio mode, the process also opens an ephemeral
+loopback HTTP listener by default so hosts without MCP App rendering can show
+the standalone UI in their browser panel. Both transports use the same tool
+contracts, instructions, resource, workbook session, and tests.
+
+`open_workbook` returns workbook metadata and, when the loopback fallback is
+active, a short-lived `browserUrl`. The URL contains a single-use launch token
+that expires after two minutes. Its first request exchanges the token for the
+HTTP-only browser session cookie and invalidates the launch token. The reusable
+browser credential is never included in MCP tool output. The fallback listener
+accepts loopback addresses only and stops with the stdio session.
 
 ### Workbook Domain
 
@@ -181,7 +190,7 @@ authorization.
 - Bind to `127.0.0.1`.
 - Open a user-selected workbook.
 - Serve the browser UI and Streamable HTTP MCP endpoint, or let a desktop host
-  launch the process over stdio.
+  launch the process over stdio with an ephemeral loopback browser fallback.
 - Store changes back to the local file.
 
 ### Hosted

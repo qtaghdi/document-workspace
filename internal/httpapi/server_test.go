@@ -8,11 +8,13 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/qtaghdi/xlsx-viewer/internal/workbook"
@@ -22,6 +24,7 @@ import (
 const (
 	stdioHelperEnv     = "XLSX_VIEWER_STDIO_HELPER"
 	stdioHelperFileEnv = "XLSX_VIEWER_STDIO_FILE"
+	stdioBrowserEnv    = "XLSX_VIEWER_STDIO_BROWSER"
 )
 
 func TestMain(m *testing.M) {
@@ -39,7 +42,13 @@ func runStdioHelper() {
 		os.Exit(1)
 	}
 	defer session.Close()
-	if err := NewWithTokens(session, "", "").RunStdio(context.Background()); err != nil {
+	server := NewWithTokens(session, "browser-token", "mcp-token")
+	if os.Getenv(stdioBrowserEnv) == "1" {
+		err = server.RunStdioWithBrowser(context.Background(), "127.0.0.1:0")
+	} else {
+		err = server.RunStdio(context.Background())
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -121,7 +130,11 @@ func TestMCPAppToolAndResource(t *testing.T) {
 	}
 	defer session.Close()
 
-	server := NewWithTokens(session, "browser-token", "mcp-token").mcpServer()
+	api := NewWithTokens(session, "browser-token", "mcp-token")
+	api.launchMu.Lock()
+	api.browserBaseURL = "http://127.0.0.1:54321"
+	api.launchMu.Unlock()
+	server := api.mcpServer()
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0.1.0"}, nil)
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	serverSession, err := server.Connect(context.Background(), serverTransport, nil)
@@ -159,6 +172,42 @@ func TestMCPAppToolAndResource(t *testing.T) {
 	if openTool.Meta["openai/outputTemplate"] != appResourceURI {
 		t.Fatalf("open_workbook compatibility metadata = %#v", openTool.Meta)
 	}
+	openResult, err := clientSession.CallTool(context.Background(), &mcp.CallToolParams{Name: "open_workbook"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	encodedOpenResult, err := json.Marshal(openResult.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var opened openWorkbookResponse
+	if err := json.Unmarshal(encodedOpenResult, &opened); err != nil {
+		t.Fatal(err)
+	}
+	if opened.Name != "book.xlsx" || opened.BrowserURL == "" {
+		t.Fatalf("open_workbook result = %#v", opened)
+	}
+	if strings.Contains(opened.BrowserURL, "browser-token") {
+		t.Fatal("open_workbook exposed the reusable browser token")
+	}
+	launchURL, err := url.Parse(opened.BrowserURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	launchResponse := httptest.NewRecorder()
+	api.Handler().ServeHTTP(launchResponse, httptest.NewRequest(http.MethodGet, launchURL.RequestURI(), nil))
+	if launchResponse.Code != http.StatusSeeOther || len(launchResponse.Result().Cookies()) != 1 {
+		t.Fatalf("launch response = %d, cookies = %#v", launchResponse.Code, launchResponse.Result().Cookies())
+	}
+	launchCookie := launchResponse.Result().Cookies()[0]
+	if launchCookie.Value != "browser-token" || !launchCookie.HttpOnly || launchCookie.SameSite != http.SameSiteStrictMode {
+		t.Fatalf("launch cookie = %#v", launchCookie)
+	}
+	reusedResponse := httptest.NewRecorder()
+	api.Handler().ServeHTTP(reusedResponse, httptest.NewRequest(http.MethodGet, launchURL.RequestURI(), nil))
+	if reusedResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("reused launch response = %d, want %d", reusedResponse.Code, http.StatusUnauthorized)
+	}
 
 	resource, err := clientSession.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: appResourceURI})
 	if err != nil {
@@ -186,7 +235,7 @@ func TestStdioTransport(t *testing.T) {
 	}
 
 	command := exec.Command(os.Args[0])
-	command.Env = append(os.Environ(), stdioHelperEnv+"=1", stdioHelperFileEnv+"="+path)
+	command.Env = append(os.Environ(), stdioHelperEnv+"=1", stdioHelperFileEnv+"="+path, stdioBrowserEnv+"=1")
 	client := mcp.NewClient(&mcp.Implementation{Name: "stdio-test-client", Version: "0.1.0"}, nil)
 	clientSession, err := client.Connect(context.Background(), &mcp.CommandTransport{Command: command}, nil)
 	if err != nil {
@@ -213,6 +262,65 @@ func TestStdioTransport(t *testing.T) {
 	}
 	if !bytes.Contains(structured, []byte(`"stdio"`)) {
 		t.Fatalf("stdio read_range structured content = %s", structured)
+	}
+	openResult, err := clientSession.CallTool(context.Background(), &mcp.CallToolParams{Name: "open_workbook"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	encodedOpenResult, err := json.Marshal(openResult.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var opened openWorkbookResponse
+	if err := json.Unmarshal(encodedOpenResult, &opened); err != nil {
+		t.Fatal(err)
+	}
+	launchURL, err := url.Parse(opened.BrowserURL)
+	if err != nil || launchURL.Scheme != "http" || launchURL.Hostname() != "127.0.0.1" {
+		t.Fatalf("stdio browser URL = %q, parse error = %v", opened.BrowserURL, err)
+	}
+	noRedirect := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	launchResponse, err := noRedirect.Get(opened.BrowserURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = launchResponse.Body.Close()
+	if launchResponse.StatusCode != http.StatusSeeOther {
+		t.Fatalf("stdio browser launch = %d, want %d", launchResponse.StatusCode, http.StatusSeeOther)
+	}
+}
+
+func TestStdioBrowserRequiresLoopback(t *testing.T) {
+	for _, addr := range []string{"0.0.0.0:0", ":0", "192.0.2.1:0"} {
+		if err := requireLoopbackAddress(addr); err == nil {
+			t.Fatalf("requireLoopbackAddress(%q) succeeded", addr)
+		}
+	}
+	for _, addr := range []string{"127.0.0.1:0", "localhost:0", "[::1]:0"} {
+		if err := requireLoopbackAddress(addr); err != nil {
+			t.Fatalf("requireLoopbackAddress(%q) = %v", addr, err)
+		}
+	}
+}
+
+func TestBrowserLaunchLinksAreBounded(t *testing.T) {
+	server := &Server{
+		browserBaseURL: "http://127.0.0.1:54321",
+		launchTokens:   make(map[string]time.Time),
+	}
+	server.launchTokens["expired"] = time.Now().Add(-time.Second)
+	if _, err := server.issueBrowserLaunchURL(); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := server.launchTokens["expired"]; exists {
+		t.Fatal("expired launch token was not pruned")
+	}
+	server.launchTokens = make(map[string]time.Time, maxLaunchTokens)
+	for index := range maxLaunchTokens {
+		server.launchTokens[fmt.Sprintf("token-%d", index)] = time.Now().Add(time.Minute)
+	}
+	if _, err := server.issueBrowserLaunchURL(); err == nil {
+		t.Fatal("launch URL was issued after reaching the outstanding-token limit")
 	}
 }
 

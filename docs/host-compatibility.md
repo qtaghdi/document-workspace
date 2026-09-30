@@ -12,19 +12,19 @@ by itself prove that a host renders and operates the MCP App UI correctly.
 | Streamable HTTP | Local browser development and remote deployment | Bearer token in local mode, OAuth for hosted mode | Self-contained MCP App resource |
 
 Stdio is the preferred local desktop path because the host starts the Go binary
-and no MCP port is exposed. Streamable HTTP remains the production transport for
-a hosted service. Remote Claude and ChatGPT connectors cannot reach a server
-bound only to `127.0.0.1`.
+and the optional browser fallback binds only to an ephemeral loopback port.
+Streamable HTTP remains the production transport for a hosted service. Remote
+Claude and ChatGPT connectors cannot reach a server bound only to `127.0.0.1`.
 
 ## Current Certification Matrix
 
-| Target | Tools | Resource metadata | Embedded UI | Bidirectional edits | Status |
-| --- | --- | --- | --- | --- | --- |
-| Go in-memory client | Passed | Passed | Bundle inspected | Passed through tool calls | Automated |
-| Go subprocess over stdio | Passed | Passed | Resource readable | Workbook read passed | Automated |
-| Streamable HTTP with bearer token | Passed | Passed | Resource readable | API and tool tests passed | Automated |
-| Claude Desktop 2.7032.0 with Code 2.1.280 | Passed | Advertised, not rendered | Not rendered | Tool writes passed, UI path pending | Tools certified, UI pending |
-| Codex Desktop 26.924.22138 | Passed | Advertised, not surfaced by CLI | Not rendered | Tool writes passed, UI path pending | Tools certified, UI pending |
+| Target | Tools | Resource metadata | Embedded UI | Browser fallback | Bidirectional edits | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| Go in-memory client | Passed | Passed | Bundle inspected | Launch exchange passed | Passed through tool calls | Automated |
+| Go subprocess over stdio | Passed | Passed | Resource readable | Real listener passed | Workbook read passed | Automated |
+| Streamable HTTP with bearer token | Passed | Passed | Resource readable | Not applicable | API and tool tests passed | Automated |
+| Claude Desktop 2.7032.0 with Code 2.1.280 | Passed | Advertised, not rendered | Not rendered | Pending | Tool writes passed, UI path pending | Tools certified, UI pending |
+| Codex Desktop 26.924.22138 | Passed | Advertised, not surfaced by CLI | Not rendered | Passed in Browser panel | Tool writes passed, browser edits pending | Tools and browser fallback certified |
 
 Do not change a pending host row to passed without recording the application
 version, operating system, transport, workbook fixture, and observed result.
@@ -81,6 +81,23 @@ version, operating system, transport, workbook fixture, and observed result.
   Codex embedded UI row pending until it is visibly rendered and edited in the
   desktop host.
 
+### Codex Browser Fallback, 2026-09-30
+
+- Host: Codex Desktop production release 26.924.22138, build 11645.
+- Operating system: macOS 26.5.1, build 25F80.
+- Transport: the release binary served MCP over stdio and an authenticated UI
+  on an ephemeral `127.0.0.1` listener owned by the same process.
+- Fixture: a disposable XLSX workbook with visible values in cells A1 and B2.
+- Launch result: `open_workbook` returned a single-use launch URL. The Codex
+  Browser panel exchanged it for an HTTP-only session cookie and redirected to
+  the workbook root.
+- Render result: the Browser panel visibly rendered the workbook name, revision
+  1, the worksheet tab, the value `Browser fallback` in A1, and the value
+  `Live workbook session` in B2.
+- Scope: this certifies launch and rendering through the loopback browser
+  fallback. Native MCP App rendering and browser-originated edit persistence
+  remain separate pending checks.
+
 References:
 
 - [OpenAI MCP server and UI quickstart](https://developers.openai.com/plugins/build/app-quickstart)
@@ -119,6 +136,8 @@ with absolute paths on the current machine.
 
 Fully quit and reopen Claude Desktop after changing its configuration. The
 server writes MCP messages only to stdout. Diagnostics are written to stderr.
+When native MCP App rendering is unavailable, ask Claude to call
+`open_workbook` and open its single-use `browserUrl` in the Browser panel.
 
 ## Codex Stdio Configuration
 
@@ -133,6 +152,8 @@ args = ["-transport", "stdio", "-file", "/absolute/path/to/workbook.xlsx"]
 
 Start a new Codex session after changing MCP configuration. Existing sessions
 may keep their previously discovered tool list.
+When native MCP App rendering is unavailable, ask Codex to call
+`open_workbook` and open its single-use `browserUrl` in the in-app browser.
 
 ## Host Approval Modes
 
@@ -161,7 +182,10 @@ Use a disposable copy of a representative workbook.
 2. Confirm that initialization succeeds and server instructions are visible to
    the client.
 3. Call `get_workbook` and `read_range` without opening the UI.
-4. Call `open_workbook` and confirm the spreadsheet renders in an iframe.
+4. Call `open_workbook` and confirm the spreadsheet renders in an iframe. If
+   the host lacks MCP App rendering, open the returned `browserUrl` in its local
+   browser panel and confirm the redirect removes the launch token from the
+   address bar.
 5. Edit one cell in the UI and verify that the revision advances exactly once.
 6. Ask the model to call `update_presence`, then `apply_operations`, and confirm
    that the AI selection and committed value appear in the UI.
@@ -180,3 +204,5 @@ Use a disposable copy of a representative workbook.
   and durable storage. The local bearer token is not a hosted identity system.
 - Host support for inline MCP Apps can differ from support for ordinary MCP
   tools. Headless tools remain usable when the UI is unavailable.
+- The stdio browser fallback requires a host that can reach the same machine's
+  loopback interface. Remote MCP connectors cannot use its launch URL.

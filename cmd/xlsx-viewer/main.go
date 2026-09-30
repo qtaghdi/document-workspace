@@ -19,6 +19,8 @@ func main() {
 	file := flag.String("file", "", "path to the XLSX workbook to open")
 	transport := flag.String("transport", "http", "MCP transport: http or stdio")
 	addr := flag.String("addr", "127.0.0.1:8765", "HTTP listen address")
+	stdioBrowser := flag.Bool("stdio-browser", true, "serve a loopback browser fallback in stdio mode")
+	stdioBrowserAddr := flag.String("stdio-browser-addr", "127.0.0.1:0", "loopback address for the stdio browser fallback")
 	browserToken := flag.String("browser-token", "", "browser session token; generated when omitted")
 	mcpToken := flag.String("mcp-token", "", "MCP bearer token; generated when omitted")
 	flag.Parse()
@@ -30,10 +32,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "unsupported transport %q: use http or stdio\n", *transport)
 		os.Exit(2)
 	}
-	if *transport == "http" && *browserToken == "" {
+	if *browserToken == "" {
 		*browserToken = randomToken()
 	}
-	if *transport == "http" && *mcpToken == "" {
+	if *mcpToken == "" {
 		*mcpToken = randomToken()
 	}
 	session, err := workbook.Open(*file)
@@ -44,7 +46,13 @@ func main() {
 
 	api := httpapi.NewWithTokens(session, *browserToken, *mcpToken)
 	if *transport == "stdio" {
-		if err := api.RunStdio(context.Background()); err != nil {
+		var err error
+		if *stdioBrowser {
+			err = api.RunStdioWithBrowser(context.Background(), *stdioBrowserAddr)
+		} else {
+			err = api.RunStdio(context.Background())
+		}
+		if err != nil {
 			log.Fatal(err)
 		}
 		return

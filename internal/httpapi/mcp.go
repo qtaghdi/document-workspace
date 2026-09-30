@@ -3,7 +3,9 @@ package httpapi
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/qtaghdi/xlsx-viewer/internal/workbook"
@@ -11,8 +13,16 @@ import (
 
 const (
 	appResourceURI     = "ui://xlsx-viewer/workbook/v1.html"
-	serverInstructions = "Call get_workbook before reads or writes. Use read_range for focused inspection. Pass the latest revision to apply_operations, and refresh after a conflict. Use open_workbook when an interactive spreadsheet helps, and update_presence before visible AI edits."
+	serverInstructions = "Call get_workbook before reads or writes. Use read_range for focused inspection. Pass the latest revision to apply_operations, and refresh after a conflict. Use open_workbook when an interactive spreadsheet helps. If it returns browserUrl because the host did not render the MCP App, open that short-lived URL in the host browser surface and do not repeat it in chat. Use update_presence before visible AI edits."
 )
+
+type openWorkbookResponse struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Sheets     []string `json:"sheets"`
+	Revision   uint64   `json:"revision"`
+	BrowserURL string   `json:"browserUrl,omitempty"`
+}
 
 type readRangeInput struct {
 	Sheet string `json:"sheet" jsonschema:"Worksheet name"`
@@ -36,6 +46,75 @@ func (s *Server) mcpHandler() http.Handler {
 // hosts. Nothing except protocol messages may be written to stdout while it runs.
 func (s *Server) RunStdio(ctx context.Context) error {
 	return s.mcpServer().Run(ctx, &mcp.StdioTransport{})
+}
+
+// RunStdioWithBrowser keeps stdout protocol-only while serving the authenticated
+// browser fallback on a loopback listener owned by the same process.
+func (s *Server) RunStdioWithBrowser(ctx context.Context, addr string) error {
+	if err := requireLoopbackAddress(addr); err != nil {
+		return err
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("listen for browser fallback: %w", err)
+	}
+	runContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+	s.launchMu.Lock()
+	s.browserBaseURL = "http://" + listener.Addr().String()
+	s.launchMu.Unlock()
+
+	httpServer := &http.Server{
+		Handler:           s.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	httpErrors := make(chan error, 1)
+	go func() {
+		err := httpServer.Serve(listener)
+		if err == http.ErrServerClosed {
+			err = nil
+		}
+		httpErrors <- err
+	}()
+	stdioErrors := make(chan error, 1)
+	go func() {
+		stdioErrors <- s.RunStdio(runContext)
+	}()
+
+	var runErr error
+	select {
+	case runErr = <-stdioErrors:
+	case err := <-httpErrors:
+		if err != nil {
+			runErr = fmt.Errorf("serve browser fallback: %w", err)
+		}
+		cancel()
+	case <-ctx.Done():
+		runErr = ctx.Err()
+	}
+	cancel()
+	shutdownContext, shutdownCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer shutdownCancel()
+	if err := httpServer.Shutdown(shutdownContext); err != nil && runErr == nil {
+		runErr = fmt.Errorf("stop browser fallback: %w", err)
+	}
+	return runErr
+}
+
+func requireLoopbackAddress(addr string) error {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return fmt.Errorf("parse browser fallback address: %w", err)
+	}
+	if host == "localhost" {
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || !ip.IsLoopback() {
+		return fmt.Errorf("browser fallback must bind to a loopback address, got %q", host)
+	}
+	return nil
 }
 
 func (s *Server) mcpServer() *mcp.Server {
@@ -72,11 +151,19 @@ func (s *Server) mcpServer() *mcp.Server {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "open_workbook",
 		Title:       "Open Workbook",
-		Description: "Open the current workbook in an interactive spreadsheet surface when the host supports MCP Apps.",
+		Description: "Open the current workbook in an interactive spreadsheet surface. When the host does not render MCP Apps, use the short-lived browserUrl fallback returned by this tool.",
 		Meta:        appMeta,
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &closedWorld},
-	}, func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, workbook.Snapshot, error) {
-		return nil, s.session.Snapshot(), nil
+	}, func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, openWorkbookResponse, error) {
+		snapshot := s.session.Snapshot()
+		browserURL, err := s.issueBrowserLaunchURL()
+		return nil, openWorkbookResponse{
+			ID:         snapshot.ID,
+			Name:       snapshot.Name,
+			Sheets:     snapshot.Sheets,
+			Revision:   snapshot.Revision,
+			BrowserURL: browserURL,
+		}, err
 	})
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_workbook",
