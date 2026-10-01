@@ -7,6 +7,7 @@ import {
   workbookEventSchema,
   workbookRangeSchema,
   workbookSnapshotSchema,
+  sheetObjectsSchema,
 } from './schemas';
 import type { EventSubscription, WorkbookClient } from './workbook-client';
 
@@ -30,6 +31,11 @@ export class HTTPWorkbookClient implements WorkbookClient {
   async readRange(sheet: string, range: string) {
     const query = new URLSearchParams({ sheet, range });
     return requestJSON(`/api/range?${query.toString()}`, workbookRangeSchema);
+  }
+
+  async readSheetObjects(sheet: string) {
+    const query = new URLSearchParams({ sheet });
+    return requestJSON(`/api/sheet-objects?${query.toString()}`, sheetObjectsSchema);
   }
 
   async applyOperations(baseRevision: number, operations: WorkbookOperation[]) {

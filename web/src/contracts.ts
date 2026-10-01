@@ -66,6 +66,46 @@ export interface ConditionalFormat {
   style?: CellStyle;
 }
 
+export interface SheetObjects {
+  sheet: string;
+  images?: SheetImage[];
+  charts?: SheetChart[];
+  truncated?: boolean;
+}
+
+export interface SheetImage {
+  id: string;
+  name?: string;
+  altText?: string;
+  mimeType: string;
+  data: string;
+  row: number;
+  column: number;
+  offsetX?: number;
+  offsetY?: number;
+  width: number;
+  height: number;
+}
+
+export interface SheetChart {
+  id: string;
+  title?: string;
+  type: 'bar' | 'line' | 'pie' | 'doughnut' | 'area';
+  row: number;
+  column: number;
+  offsetX?: number;
+  offsetY?: number;
+  width: number;
+  height: number;
+  series: ChartSeries[];
+}
+
+export interface ChartSeries {
+  name?: string;
+  categories: string[];
+  values: number[];
+}
+
 interface CellOperation {
   sheet: string;
   cell: string;

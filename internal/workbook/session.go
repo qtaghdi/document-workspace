@@ -31,6 +31,14 @@ func Open(path string) (*Session, error) {
 	if info.Size() > maxWorkbookBytes {
 		return nil, fmt.Errorf("workbook exceeds %d bytes", maxWorkbookBytes)
 	}
+	current, err := os.ReadFile(abs)
+	if err != nil {
+		return nil, fmt.Errorf("read workbook: %w", err)
+	}
+	historyStore, revision, undoHistory, redoHistory, err := loadHistoryStore(abs, current)
+	if err != nil {
+		return nil, err
+	}
 	f, err := excelize.OpenFile(abs)
 	if err != nil {
 		return nil, fmt.Errorf("open workbook: %w", err)
@@ -46,13 +54,16 @@ func Open(path string) (*Session, error) {
 		return nil, err
 	}
 	return &Session{
-		id:          randomID(),
-		path:        abs,
-		file:        f,
-		revision:    1,
-		subscribers: make(map[chan Event]struct{}),
-		dimensions:  dimensions,
-		warnings:    warnings,
+		id:           randomID(),
+		path:         abs,
+		file:         f,
+		revision:     revision,
+		subscribers:  make(map[chan Event]struct{}),
+		dimensions:   dimensions,
+		warnings:     warnings,
+		undoHistory:  undoHistory,
+		redoHistory:  redoHistory,
+		historyStore: historyStore,
 	}, nil
 }
 
@@ -169,12 +180,29 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 			return Snapshot{}, dimensionsErr
 		}
 	}
-	if err := s.persistLocked(); err != nil {
+	nextContent, err := s.serializeLocked()
+	if err != nil {
 		s.reloadLocked()
 		return Snapshot{}, err
 	}
+	nextUndo := appendBoundedHistory(append([][]byte(nil), s.undoHistory...), previous)
+	nextRedo := [][]byte(nil)
+	if err := s.historyStore.prepare(nextRevision, nextContent, nextUndo, nextRedo); err != nil {
+		s.reloadLocked()
+		return Snapshot{}, err
+	}
+	if err := s.replaceBytesLocked(nextContent); err != nil {
+		s.historyStore.abort()
+		s.reloadLocked()
+		return Snapshot{}, err
+	}
+	historyCommitErr := s.historyStore.commit()
 	s.revision = nextRevision
-	s.recordHistoryLocked(previous)
+	s.undoHistory = nextUndo
+	s.redoHistory = nextRedo
+	if historyCommitErr != nil {
+		s.addHistoryWarningLocked(historyCommitErr)
+	}
 	if structuralDimensions != nil {
 		s.dimensions = structuralDimensions
 	} else {
@@ -228,28 +256,37 @@ func (s *Session) RestoreHistory(baseRevision uint64, actor, direction string) (
 	}
 	targetIndex := len(*source) - 1
 	target := (*source)[targetIndex]
-	if err := s.replaceBytesLocked(target); err != nil {
+	nextSource := append([][]byte(nil), (*source)[:targetIndex]...)
+	nextDestination := appendBoundedHistory(append([][]byte(nil), (*destination)...), current)
+	nextRevision := s.revision + 1
+	var nextUndo, nextRedo [][]byte
+	if direction == "undo" {
+		nextUndo, nextRedo = nextSource, nextDestination
+	} else {
+		nextUndo, nextRedo = nextDestination, nextSource
+	}
+	if err := s.historyStore.prepare(nextRevision, target, nextUndo, nextRedo); err != nil {
 		return Snapshot{}, err
 	}
+	if err := s.replaceBytesLocked(target); err != nil {
+		s.historyStore.abort()
+		return Snapshot{}, err
+	}
+	historyCommitErr := s.historyStore.commit()
 	s.reloadLocked()
 	dimensions, err := inspectSheetDimensions(s.file)
 	if err != nil {
 		return Snapshot{}, err
 	}
 	s.dimensions = dimensions
-	*source = (*source)[:targetIndex]
-	*destination = appendBoundedHistory(*destination, current)
-	s.revision++
+	s.undoHistory = nextUndo
+	s.redoHistory = nextRedo
+	s.revision = nextRevision
+	if historyCommitErr != nil {
+		s.addHistoryWarningLocked(historyCommitErr)
+	}
 	s.publishLocked(Event{Revision: s.revision, Actor: actor, Type: "workbook.reload", State: direction})
 	return s.snapshotLocked(), nil
-}
-
-func (s *Session) recordHistoryLocked(previous []byte) {
-	s.redoHistory = nil
-	if len(previous) > maxHistorySnapshotBytes {
-		return
-	}
-	s.undoHistory = appendBoundedHistory(s.undoHistory, previous)
 }
 
 func appendBoundedHistory(history [][]byte, snapshot []byte) [][]byte {
@@ -261,6 +298,18 @@ func appendBoundedHistory(history [][]byte, snapshot []byte) [][]byte {
 		history = append([][]byte(nil), history[len(history)-maxHistoryEntries:]...)
 	}
 	return history
+}
+
+func (s *Session) addHistoryWarningLocked(_ error) {
+	for _, warning := range s.warnings {
+		if warning.Feature == "durable history" {
+			return
+		}
+	}
+	s.warnings = append(s.warnings, FeatureWarning{
+		Feature: "durable history",
+		Message: "the workbook was saved, but durable undo history could not be finalized; restart the session to recover it",
+	})
 }
 
 func structuralSelection(operation Operation) string {

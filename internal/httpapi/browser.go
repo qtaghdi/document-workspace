@@ -106,6 +106,15 @@ func (s *Server) getRange(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+func (s *Server) getSheetObjects(w http.ResponseWriter, r *http.Request) {
+	result, err := s.session.ReadSheetObjects(r.URL.Query().Get("sheet"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (s *Server) applyOperations(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	var input applyInput

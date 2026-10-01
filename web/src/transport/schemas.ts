@@ -56,6 +56,38 @@ export const workbookRangeSchema = z.object({
   })).optional(),
 });
 
+const sheetObjectPositionSchema = {
+  id: z.string(),
+  row: z.number().int().nonnegative(),
+  column: z.number().int().nonnegative(),
+  offsetX: z.number().int().optional(),
+  offsetY: z.number().int().optional(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+};
+
+export const sheetObjectsSchema = z.object({
+  sheet: z.string(),
+  images: z.array(z.object({
+    ...sheetObjectPositionSchema,
+    name: z.string().optional(),
+    altText: z.string().optional(),
+    mimeType: z.string(),
+    data: z.string(),
+  })).optional(),
+  charts: z.array(z.object({
+    ...sheetObjectPositionSchema,
+    title: z.string().optional(),
+    type: z.enum(['bar', 'line', 'pie', 'doughnut', 'area']),
+    series: z.array(z.object({
+      name: z.string().optional(),
+      categories: z.array(z.string()),
+      values: z.array(z.number()),
+    })),
+  })).optional(),
+  truncated: z.boolean().optional(),
+});
+
 const eventBase = {
   sequence: z.number().int().nonnegative(),
   revision: z.number().int().nonnegative(),

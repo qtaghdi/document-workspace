@@ -8,13 +8,18 @@ allowBuilds:
 catalog:
   '@univerjs/core': 1.0.2
   '@univerjs/design': 1.0.2
+  '@univerjs/docs-drawing': 1.0.2
   '@univerjs/docs': 1.0.2
   '@univerjs/docs-ui': 1.0.2
+  '@univerjs/drawing': 1.0.2
+  '@univerjs/drawing-ui': 1.0.2
   '@univerjs/engine-formula': 1.0.2
   '@univerjs/engine-render': 1.0.2
   '@univerjs/preset-sheets-core': 1.0.2
   '@univerjs/presets': 1.0.2
   '@univerjs/sheets': 1.0.2
+  '@univerjs/sheets-drawing': 1.0.2
+  '@univerjs/sheets-drawing-ui': 1.0.2
   '@univerjs/sheets-conditional-formatting': 1.0.2
   '@univerjs/sheets-data-validation': 1.0.2
   '@univerjs/sheets-data-validation-ui': 1.0.2

@@ -8,10 +8,11 @@ import type {
   WorkbookSnapshot,
   ViewportChange,
   HistoryDirection,
+  SheetObjects,
 } from './contracts';
 
 export interface SpreadsheetEngine {
-  initialize(snapshot: WorkbookSnapshot, ranges: WorkbookRange[]): void;
+  initialize(snapshot: WorkbookSnapshot, ranges: WorkbookRange[], objects: SheetObjects[]): void;
   onCellEdit(listener: (edit: CellEdit) => void): void;
   onRangeEdit(listener: (edit: RangeEdit) => void): void;
   onSelectionChange(listener: (selection: SelectionChange) => void): void;

@@ -57,12 +57,20 @@ func inspectFeatureWarnings(path string) ([]FeatureWarning, error) {
 	}
 
 	features := []string{"charts", "images", "conditional formatting", "data validation", "external links", "macros"}
+	messages := map[string]string{
+		"charts":                 "charts are shown as read-only previews and refresh when the workbook reopens",
+		"images":                 "images are shown in the browser, but image edits are not written back yet",
+		"conditional formatting": "conditional formatting is preserved, with common numeric rules rendered in the browser",
+		"data validation":        "data validation is preserved, with inline list rules editable in the browser",
+		"external links":         "external links are preserved but are not opened or evaluated by the browser",
+		"macros":                 "macros are preserved when possible but are never executed",
+	}
 	warnings := make([]FeatureWarning, 0, len(features))
 	for _, feature := range features {
 		if detected[feature] {
 			warnings = append(warnings, FeatureWarning{
 				Feature: feature,
-				Message: feature + " is preserved when possible but is not fully rendered or editable in the browser",
+				Message: messages[feature],
 			})
 		}
 	}

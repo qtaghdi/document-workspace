@@ -32,6 +32,7 @@ Current tools:
 - `open_workbook`
 - `get_workbook`
 - `read_range`
+- `get_sheet_objects` for the embedded app
 - `apply_operations`
 - `restore_history`
 - `update_presence`
@@ -73,7 +74,9 @@ The package is organized by responsibility within that boundary:
 - `session.go` owns lifecycle and transactional batch application.
 - `operations.go` owns operation validation and XLSX mutation mapping.
 - `read.go` owns XLSX range, style, and merged-cell reads.
+- `objects.go` owns bounded image extraction and chart preview data.
 - `persistence.go` owns same-directory atomic replacement and reload behavior.
+- `history_store.go` owns durable local undo and redo snapshots.
 - `events.go` owns bounded event retention and subscriber delivery.
 - `types.go` owns the domain and wire contract structs.
 
@@ -121,18 +124,25 @@ unbounded workbook from forcing a full import into browser memory. Scroll
 events request aligned 10,000-cell tiles on demand when the viewport moves
 beyond loaded rectangles.
 
-The session keeps up to ten in-memory revision snapshots for server-authoritative
-undo and redo. Individual snapshots larger than 32 MB are not retained. Undo
-and redo restore a complete prior XLSX package, persist it atomically, advance
-the revision, and publish a `workbook.reload` event. Persistent operation-log
-history across process restarts remains future work.
+The session keeps up to ten revision snapshots for server-authoritative undo and
+redo. Individual snapshots larger than 32 MB are not retained. Undo and redo
+restore a complete prior XLSX package, persist it atomically, advance the
+revision, and publish a `workbook.reload` event. A hidden sidecar directory next
+to the workbook stores hash-addressed snapshots and an atomic manifest, so the
+revision and available history survive process restarts. A pending manifest is
+reconciled after an interrupted save. If another program replaces the workbook,
+the content hash mismatch starts a fresh history instead of applying stale
+snapshots.
 
 Workbook snapshots report detected charts, images, conditional formatting,
 data validation, external links, and macros. The browser displays a
 compatibility notice for detected features that it cannot fully render or edit.
 List validation and numeric cell conditional formatting have initial OSS Univer
-mappings. Other rule types and workbook objects remain notice-only. This
-distinguishes visual limitations from silent feature loss.
+mappings. PNG, JPEG, and GIF images use Univer's OSS drawing packages. Supported
+chart types are extracted as bounded series data and rendered as read-only SVG
+previews because Univer's native chart package is not open source. Object edits
+are not written back yet. Unsupported or oversized objects are omitted with a
+visible notice. This distinguishes visual limitations from silent feature loss.
 
 Only Univer open-source packages are allowed. The Go service will provide
 collaboration, presence state, operation ordering, and XLSX persistence. The UI
@@ -147,9 +157,9 @@ contracts.
 The Univer integration registers required plugins explicitly instead of using
 the complete sheets preset. The MCP App build retains English hyphenation data
 and removes unused language dictionaries from Univer's renderer. This keeps the
-self-contained resource near 8.1 MB after adding validation and conditional
-formatting support, without changing the standalone browser build or loading
-runtime code from a CDN.
+self-contained resource near 8.4 MB after adding validation, conditional
+formatting, and drawing support, without changing the standalone browser build
+or loading runtime code from a CDN.
 
 See [`adr/0001-spreadsheet-engine.md`](adr/0001-spreadsheet-engine.md) for the
 engine comparison and decision.
@@ -171,7 +181,10 @@ A successful batch advances the revision once.
 
 The service serializes the workbook to a temporary file in the same directory,
 flushes it, closes it, and atomically replaces the original path. Using the same
-directory avoids cross-filesystem rename behavior.
+directory avoids cross-filesystem rename behavior. Before replacement, it
+writes a pending durable history manifest. After replacement, it atomically
+promotes that manifest. Startup reconciles an interrupted promotion by checking
+the current workbook hash.
 
 Compatibility tests copy committed fixtures from `testdata/compatibility` to a
 temporary directory, inventory unrelated workbook features, apply an edit
@@ -241,11 +254,11 @@ authorization.
 
 ## Architectural Decisions Pending
 
-- Editable browser mappings for validation, conditional formatting, charts,
-  and images. Detection and compatibility notices are implemented.
+- Broader validation and conditional formatting mappings, editable image and
+  chart write-back, and additional chart type previews.
 - Further production JavaScript startup reductions beyond the current plugin
   mode and locale pruning.
 - Formula calculation strategy.
-- Operation log persistence format.
+- Hosted audit operation log persistence format.
 - Durable event replay retention policy.
 - OAuth provider and hosted tenancy model.

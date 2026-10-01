@@ -5,6 +5,7 @@ import type {
   WorkbookRange,
   WorkbookSnapshot,
   HistoryDirection,
+  SheetObjects,
 } from '../contracts';
 
 export interface ApplyResponse {
@@ -21,6 +22,7 @@ export interface WorkbookClient {
   connect(): Promise<void>;
   getWorkbook(): Promise<WorkbookSnapshot>;
   readRange(sheet: string, range: string): Promise<WorkbookRange>;
+  readSheetObjects(sheet: string): Promise<SheetObjects>;
   applyOperations(baseRevision: number, operations: WorkbookOperation[]): Promise<ApplyResponse>;
   restoreHistory(baseRevision: number, direction: HistoryDirection): Promise<ApplyResponse>;
   updatePresence(selection: SelectionChange): Promise<void>;

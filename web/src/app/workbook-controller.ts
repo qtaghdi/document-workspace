@@ -49,9 +49,20 @@ export class WorkbookController {
       for (const ref of initialRanges.refs) {
         ranges.push(await this.client.readRange(ref.sheet, ref.range));
       }
+      const objects = [];
+      for (const sheet of snapshot.sheets) {
+        objects.push(await this.client.readSheetObjects(sheet));
+      }
       this.revision = snapshot.revision;
       this.view.setWorkbookName(snapshot.name);
-      this.view.showWarnings(snapshot.warnings ?? []);
+      const warnings = [...(snapshot.warnings ?? [])];
+      if (objects.some((sheetObjects) => sheetObjects.truncated)) {
+        warnings.push({
+          feature: 'sheet-objects',
+          message: 'Some images or charts were omitted because preview safety limits were reached.',
+        });
+      }
+      this.view.showWarnings(warnings);
       this.view.setHistoryState(snapshot.canUndo, snapshot.canRedo);
       this.view.onHistoryAction((direction) => this.queueHistoryAction(direction));
       this.view.showRevision(
@@ -60,7 +71,7 @@ export class WorkbookController {
       );
 
       this.engine = this.createEngine(this.view.spreadsheet);
-      this.engine.initialize(snapshot, ranges);
+      this.engine.initialize(snapshot, ranges, objects);
       this.engine.onCellEdit((edit) => this.queueCellEdit(edit));
       this.engine.onRangeEdit((edit) => this.queueRangeEdit(edit));
       this.engine.onSelectionChange((selection) => this.queuePresence(selection));

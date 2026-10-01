@@ -1,6 +1,10 @@
 import { LocaleType, mergeLocales } from '@univerjs/core';
 import { UniverDocsPlugin } from '@univerjs/docs';
+import { UniverDocsDrawingPlugin } from '@univerjs/docs-drawing';
 import { UniverDocsUIPlugin } from '@univerjs/docs-ui';
+import { UniverDrawingPlugin } from '@univerjs/drawing';
+import { UniverDrawingUIPlugin } from '@univerjs/drawing-ui';
+import DrawingUIEnUS from '@univerjs/drawing-ui/locale/en-US';
 import { UniverFormulaEnginePlugin } from '@univerjs/engine-formula';
 import { UniverRenderEnginePlugin } from '@univerjs/engine-render';
 import { createUniver } from '@univerjs/presets';
@@ -10,6 +14,9 @@ import { UniverSheetsFormulaUIPlugin } from '@univerjs/sheets-formula-ui';
 import { UniverSheetsNumfmtPlugin } from '@univerjs/sheets-numfmt';
 import { UniverSheetsNumfmtUIPlugin } from '@univerjs/sheets-numfmt-ui';
 import { UniverSheetsUIPlugin } from '@univerjs/sheets-ui';
+import { UniverSheetsDrawingPlugin } from '@univerjs/sheets-drawing';
+import { UniverSheetsDrawingUIPlugin } from '@univerjs/sheets-drawing-ui';
+import SheetsDrawingUIEnUS from '@univerjs/sheets-drawing-ui/locale/en-US';
 import { UniverSheetsDataValidationPlugin } from '@univerjs/sheets-data-validation';
 import { UniverSheetsDataValidationUIPlugin } from '@univerjs/sheets-data-validation-ui';
 import { UniverSheetsConditionalFormattingPlugin } from '@univerjs/sheets-conditional-formatting';
@@ -17,12 +24,15 @@ import { UniverUIPlugin } from '@univerjs/ui';
 import UniverPresetSheetsCoreEnUS from '@univerjs/preset-sheets-core/locales/en-US';
 
 import '@univerjs/docs-ui/facade';
+import '@univerjs/docs-drawing/facade';
 import '@univerjs/engine-formula/facade';
 import '@univerjs/sheets/facade';
 import '@univerjs/sheets-formula/facade';
 import '@univerjs/sheets-formula-ui/facade';
 import '@univerjs/sheets-numfmt/facade';
 import '@univerjs/sheets-ui/facade';
+import '@univerjs/sheets-drawing/facade';
+import '@univerjs/sheets-drawing-ui/facade';
 import '@univerjs/sheets-data-validation/facade';
 import '@univerjs/sheets-conditional-formatting/facade';
 import '@univerjs/ui/facade';
@@ -37,6 +47,8 @@ import type {
   WorkbookOperation,
   ViewportChange,
   HistoryDirection,
+  SheetObjects,
+  SheetChart,
 } from './contracts';
 import { parseCellAddress, toA1Range } from './spreadsheet/a1';
 import { formatAfterCommand } from './spreadsheet/univer/command-mapper';
@@ -68,17 +80,26 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
     const { univer, univerAPI } = createUniver({
       locale: LocaleType.EN_US,
       locales: {
-        [LocaleType.EN_US]: mergeLocales(UniverPresetSheetsCoreEnUS),
+        [LocaleType.EN_US]: mergeLocales(
+          UniverPresetSheetsCoreEnUS,
+          DrawingUIEnUS,
+          SheetsDrawingUIEnUS,
+        ),
       },
       presets: [],
       plugins: [
-        UniverDocsPlugin,
         UniverRenderEnginePlugin,
         [UniverUIPlugin, { container, ribbonType: 'simple' }],
+        UniverDocsPlugin,
         UniverDocsUIPlugin,
         UniverFormulaEnginePlugin,
         UniverSheetsPlugin,
         UniverSheetsUIPlugin,
+        UniverDrawingPlugin,
+        UniverDrawingUIPlugin,
+        UniverDocsDrawingPlugin,
+        UniverSheetsDrawingPlugin,
+        UniverSheetsDrawingUIPlugin,
         UniverSheetsNumfmtPlugin,
         UniverSheetsNumfmtUIPlugin,
         UniverSheetsFormulaPlugin,
@@ -92,7 +113,18 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
     this.univerAPI = univerAPI;
   }
 
-  initialize(snapshot: WorkbookSnapshot, ranges: WorkbookRange[]): void {
+  initialize(snapshot: WorkbookSnapshot, ranges: WorkbookRange[], objects: SheetObjects[]): void {
+    let objectsApplied = false;
+    this.subscriptions.push(this.univerAPI.addEvent(
+      this.univerAPI.Event.LifeCycleChanged,
+      ({ stage }) => {
+        if (objectsApplied || stage !== this.univerAPI.Enum.LifecycleStages.Rendered) {
+          return;
+        }
+        objectsApplied = true;
+        void this.applySheetObjects(objects);
+      },
+    ));
     this.univerAPI.createWorkbook(toUniverWorkbook(snapshot, ranges));
     for (const range of ranges) {
       this.applyWorkbookFeatures(range);
@@ -321,6 +353,44 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
     }
   }
 
+  private async applySheetObjects(groups: SheetObjects[]): Promise<void> {
+    this.applyingRemote = true;
+    try {
+      const workbook = this.univerAPI.getActiveWorkbook();
+      if (!workbook) return;
+      for (const group of groups) {
+        const worksheet = workbook.getSheetByName(group.sheet);
+        if (!worksheet) continue;
+        for (const source of group.images ?? []) {
+          const image = await worksheet.newOverGridImage()
+            .setSource(`data:${source.mimeType};base64,${source.data}`, this.univerAPI.Enum.ImageSourceType.BASE64)
+            .setColumn(source.column)
+            .setRow(source.row)
+            .setColumnOffset(source.offsetX ?? 0)
+            .setRowOffset(source.offsetY ?? 0)
+            .setWidth(source.width)
+            .setHeight(source.height)
+            .buildAsync();
+          worksheet.insertImages([image]);
+        }
+        for (const chart of group.charts ?? []) {
+          const image = await worksheet.newOverGridImage()
+            .setSource(chartDataURL(chart), this.univerAPI.Enum.ImageSourceType.BASE64)
+            .setColumn(chart.column)
+            .setRow(chart.row)
+            .setColumnOffset(chart.offsetX ?? 0)
+            .setRowOffset(chart.offsetY ?? 0)
+            .setWidth(chart.width)
+            .setHeight(chart.height)
+            .buildAsync();
+          worksheet.insertImages([image]);
+        }
+      }
+    } finally {
+      this.applyingRemote = false;
+    }
+  }
+
   applyRemoteEvent(event: WorkbookEvent): void {
     if (!('sheet' in event) || !event.sheet) {
       return;
@@ -467,4 +537,119 @@ function parseValidationList(formula: string): string[] {
     ? formula.slice(1, -1).replaceAll('""', '"')
     : formula;
   return normalized.split(',').map((value) => value.trim()).filter(Boolean);
+}
+
+const chartColors = ['#2563eb', '#059669', '#dc2626', '#7c3aed', '#d97706', '#0891b2'];
+
+function chartDataURL(chart: SheetChart): string {
+  const svg = renderChartSVG(chart);
+  const bytes = new TextEncoder().encode(svg);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return `data:image/svg+xml;base64,${window.btoa(binary)}`;
+}
+
+function renderChartSVG(chart: SheetChart): string {
+  const width = Math.max(240, chart.width);
+  const height = Math.max(160, chart.height);
+  const title = escapeXML(chart.title || 'Chart preview');
+  const frame = `<rect x="0.5" y="0.5" width="${width - 1}" height="${height - 1}" rx="4" fill="#ffffff" stroke="#cbd5e1"/>`;
+  const heading = `<text x="${width / 2}" y="24" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="600" fill="#0f172a">${title}</text>`;
+  const body = chart.type === 'pie' || chart.type === 'doughnut'
+    ? renderPieChart(chart, width, height)
+    : renderCartesianChart(chart, width, height);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${frame}${heading}${body}</svg>`;
+}
+
+function renderCartesianChart(chart: SheetChart, width: number, height: number): string {
+  const left = 42;
+  const top = 40;
+  const right = 18;
+  const bottom = 42;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const categories = chart.series[0]?.categories ?? [];
+  const values = chart.series.flatMap((series) => series.values).filter(Number.isFinite);
+  const maximum = Math.max(1, ...values);
+  const axes = `<path d="M${left} ${top}V${top + plotHeight}H${left + plotWidth}" fill="none" stroke="#94a3b8"/>`;
+  const labels = categories.map((category, index) => {
+    const x = left + ((index + 0.5) * plotWidth) / Math.max(1, categories.length);
+    return `<text x="${x}" y="${top + plotHeight + 18}" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#475569">${escapeXML(shortLabel(category))}</text>`;
+  }).join('');
+  if (chart.type === 'bar') {
+    const groupWidth = plotWidth / Math.max(1, categories.length);
+    const barWidth = Math.max(3, (groupWidth * 0.72) / Math.max(1, chart.series.length));
+    const bars = chart.series.flatMap((series, seriesIndex) => series.values.map((value, index) => {
+      const barHeight = Math.max(0, (value / maximum) * plotHeight);
+      const x = left + index * groupWidth + groupWidth * 0.14 + seriesIndex * barWidth;
+      const y = top + plotHeight - barHeight;
+      return `<rect x="${x}" y="${y}" width="${barWidth - 1}" height="${barHeight}" fill="${chartColors[seriesIndex % chartColors.length]}"/>`;
+    })).join('');
+    return axes + bars + labels + renderLegend(chart, width, height);
+  }
+  const paths = chart.series.map((series, seriesIndex) => {
+    const points = series.values.map((value, index) => {
+      const x = left + ((index + 0.5) * plotWidth) / Math.max(1, series.values.length);
+      const y = top + plotHeight - (value / maximum) * plotHeight;
+      return `${x},${y}`;
+    });
+    const color = chartColors[seriesIndex % chartColors.length];
+    const area = chart.type === 'area' && points.length > 0
+      ? `<polygon points="${left + plotWidth / Math.max(2, points.length * 2)},${top + plotHeight} ${points.join(' ')} ${left + plotWidth - plotWidth / Math.max(2, points.length * 2)},${top + plotHeight}" fill="${color}" fill-opacity="0.18"/>`
+      : '';
+    return `${area}<polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="2"/>`;
+  }).join('');
+  return axes + paths + labels + renderLegend(chart, width, height);
+}
+
+function renderPieChart(chart: SheetChart, width: number, height: number): string {
+  const series = chart.series[0];
+  if (!series) return '';
+  const total = series.values.reduce((sum, value) => sum + Math.max(0, value), 0);
+  if (total <= 0) return '';
+  const radius = Math.max(30, Math.min(width * 0.24, (height - 58) * 0.45));
+  const centerX = width * 0.38;
+  const centerY = 40 + (height - 58) / 2;
+  let angle = -Math.PI / 2;
+  const slices = series.values.map((value, index) => {
+    const portion = Math.max(0, value) / total;
+    const next = angle + portion * Math.PI * 2;
+    const largeArc = next - angle > Math.PI ? 1 : 0;
+    const x1 = centerX + radius * Math.cos(angle);
+    const y1 = centerY + radius * Math.sin(angle);
+    const x2 = centerX + radius * Math.cos(next);
+    const y2 = centerY + radius * Math.sin(next);
+    const path = `<path d="M${centerX} ${centerY}L${x1} ${y1}A${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}Z" fill="${chartColors[index % chartColors.length]}"/>`;
+    angle = next;
+    return path;
+  }).join('');
+  const hole = chart.type === 'doughnut'
+    ? `<circle cx="${centerX}" cy="${centerY}" r="${radius * 0.52}" fill="#ffffff"/>`
+    : '';
+  const legend = series.categories.map((category, index) => {
+    const y = 52 + index * 18;
+    return `<rect x="${width * 0.68}" y="${y - 9}" width="10" height="10" fill="${chartColors[index % chartColors.length]}"/><text x="${width * 0.68 + 15}" y="${y}" font-family="Arial, sans-serif" font-size="10" fill="#334155">${escapeXML(shortLabel(category))}</text>`;
+  }).join('');
+  return slices + hole + legend;
+}
+
+function renderLegend(chart: SheetChart, width: number, height: number): string {
+  if (chart.series.length < 2) return '';
+  return chart.series.map((series, index) => {
+    const x = 46 + index * Math.max(72, (width - 60) / chart.series.length);
+    return `<rect x="${x}" y="${height - 14}" width="9" height="9" fill="${chartColors[index % chartColors.length]}"/><text x="${x + 13}" y="${height - 6}" font-family="Arial, sans-serif" font-size="9" fill="#475569">${escapeXML(shortLabel(series.name || `Series ${index + 1}`))}</text>`;
+  }).join('');
+}
+
+function shortLabel(value: string): string {
+  return value.length > 14 ? `${value.slice(0, 13)}…` : value;
+}
+
+function escapeXML(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
 }

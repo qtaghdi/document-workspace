@@ -8,6 +8,7 @@ import {
   presenceResponseSchema,
   workbookRangeSchema,
   workbookSnapshotSchema,
+  sheetObjectsSchema,
 } from './schemas';
 import type { EventSubscription, WorkbookClient } from './workbook-client';
 
@@ -29,6 +30,10 @@ export class MCPWorkbookClient implements WorkbookClient {
 
   async readRange(sheet: string, range: string) {
     return this.callTool('read_range', { sheet, range }, workbookRangeSchema);
+  }
+
+  async readSheetObjects(sheet: string) {
+    return this.callTool('get_sheet_objects', { sheet }, sheetObjectsSchema);
   }
 
   async applyOperations(baseRevision: number, operations: WorkbookOperation[]) {

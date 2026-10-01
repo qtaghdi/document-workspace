@@ -66,6 +66,7 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /assets/", s.requireSession(http.FileServer(http.FS(assets))))
 	s.mux.Handle("GET /api/workbook", s.requireSession(http.HandlerFunc(s.getWorkbook)))
 	s.mux.Handle("GET /api/range", s.requireSession(http.HandlerFunc(s.getRange)))
+	s.mux.Handle("GET /api/sheet-objects", s.requireSession(http.HandlerFunc(s.getSheetObjects)))
 	s.mux.Handle("POST /api/operations", s.requireSession(http.HandlerFunc(s.applyOperations)))
 	s.mux.Handle("POST /api/history/{direction}", s.requireSession(http.HandlerFunc(s.restoreHistory)))
 	s.mux.Handle("POST /api/presence", s.requireSession(http.HandlerFunc(s.updatePresence)))

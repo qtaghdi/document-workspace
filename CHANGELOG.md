@@ -77,6 +77,12 @@ and this project intends to follow Semantic Versioning when releases begin.
 - Added OSS Univer rendering for XLSX list validation and numeric conditional
   formatting rules loaded from the Go workbook adapter.
 - Added a LibreOffice-produced workbook fixture to the compatibility corpus.
+- Added restart-safe local undo and redo history with hash-addressed snapshots,
+  atomic manifest recovery, and external workbook replacement detection.
+- Added a bounded sheet object API for browser and MCP App image and chart
+  previews.
+- Added OSS Univer image rendering and custom read-only previews for bar, line,
+  area, pie, and doughnut charts without adding Univer Pro dependencies.
 
 ### Changed
 
@@ -99,6 +105,8 @@ and this project intends to follow Semantic Versioning when releases begin.
   unions that encode required fields for each command and event type.
 - Documented host-owned manual, automatic, one-time, and persistent approval
   behavior for workbook MCP tools.
+- Updated compatibility notices to distinguish rendered but non-editable images
+  and charts from partially supported workbook rules.
 
 ### Fixed
 
@@ -106,6 +114,8 @@ and this project intends to follow Semantic Versioning when releases begin.
   next human edit does not submit a stale base revision.
 - Loaded worksheet data in bounded range chunks using server-reported sheet
   dimensions instead of limiting every sheet to the first 200 rows.
+- Kept large or unsupported sheet objects from blocking workbook startup by
+  omitting them with a visible compatibility notice.
 
 ### Security
 
@@ -117,6 +127,10 @@ and this project intends to follow Semantic Versioning when releases begin.
   request body limits, range size limits, and baseline security headers.
 - Protected stdio browser fallback links with single-use two-minute launch
   tokens, loopback-only binding, and a bounded outstanding-token set.
+- Validated embedded image bytes before rendering and allowed only decoded PNG,
+  JPEG, and GIF data within the preview byte and object limits.
+- Bounded durable history manifests, image dimensions, chart series, points,
+  and labels before loading them into application memory.
 
 ## 0.0.1 - 2026-09-28
 

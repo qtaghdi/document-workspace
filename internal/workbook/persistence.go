@@ -11,11 +11,19 @@ import (
 )
 
 func (s *Session) persistLocked() error {
+	content, err := s.serializeLocked()
+	if err != nil {
+		return err
+	}
+	return s.replaceBytesLocked(content)
+}
+
+func (s *Session) serializeLocked() ([]byte, error) {
 	buffer, err := s.file.WriteToBuffer()
 	if err != nil {
-		return fmt.Errorf("serialize workbook: %w", err)
+		return nil, fmt.Errorf("serialize workbook: %w", err)
 	}
-	return s.replaceBytesLocked(buffer.Bytes())
+	return buffer.Bytes(), nil
 }
 
 func (s *Session) replaceBytesLocked(content []byte) error {

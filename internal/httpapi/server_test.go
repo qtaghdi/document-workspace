@@ -379,6 +379,31 @@ func TestBrowserAndMCPUseSeparateTokens(t *testing.T) {
 	}
 }
 
+func TestBrowserReadsBoundedSheetObjects(t *testing.T) {
+	path := filepath.Join("..", "..", "testdata", "compatibility", "feature-rich.xlsx")
+	session, err := workbook.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	handler := NewWithTokens(session, "browser-token", "mcp-token").Handler()
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/sheet-objects?sheet=Compatibility", nil)
+	request.AddCookie(&http.Cookie{Name: "xlsx_session", Value: "browser-token"})
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("GET /api/sheet-objects = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
+	}
+	var objects workbook.SheetObjects
+	if err := json.NewDecoder(response.Body).Decode(&objects); err != nil {
+		t.Fatal(err)
+	}
+	if len(objects.Images) != 1 || len(objects.Charts) != 1 {
+		t.Fatalf("sheet objects = %#v", objects)
+	}
+}
+
 func TestBrowserAndMCPShareRevisionedWorkbookSession(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "book.xlsx")
 	file := excelize.NewFile()

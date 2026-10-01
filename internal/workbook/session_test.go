@@ -392,6 +392,19 @@ func TestFeatureWarningsDetectBrowserCompatibilityGaps(t *testing.T) {
 	if len(rangeData.ConditionalFormatting) == 0 || rangeData.ConditionalFormatting[0].Style == nil {
 		t.Fatalf("conditional formatting = %#v", rangeData.ConditionalFormatting)
 	}
+	objects, err := session.ReadSheetObjects("Compatibility")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(objects.Images) != 1 || objects.Images[0].Data == "" || objects.Images[0].Width < 1 || objects.Images[0].Height < 1 {
+		t.Fatalf("images = %#v", objects.Images)
+	}
+	if len(objects.Charts) != 1 || objects.Charts[0].Type != "bar" || len(objects.Charts[0].Series) != 1 {
+		t.Fatalf("charts = %#v", objects.Charts)
+	}
+	if got := objects.Charts[0].Series[0].Values; len(got) != 3 || got[0] != 1250.5 || got[2] != 420.75 {
+		t.Fatalf("chart values = %#v", got)
+	}
 }
 
 func TestUndoAndRedoRestoreCommittedWorkbookRevisions(t *testing.T) {
@@ -438,5 +451,110 @@ func TestUndoAndRedoRestoreCommittedWorkbookRevisions(t *testing.T) {
 	value, err = session.ReadRange("Sheet1", "A1")
 	if err != nil || value.Rows[0][0].Value != "after" {
 		t.Fatalf("redo value = %#v, error = %v", value, err)
+	}
+}
+
+func TestUndoAndRedoHistorySurvivesSessionRestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "book.xlsx")
+	file := excelize.NewFile()
+	if err := file.SetCellValue("Sheet1", "A1", "before"); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+	_ = file.Close()
+
+	first, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed, err := first.Apply(1, "human", []Operation{{Type: "set_cell", Sheet: "Sheet1", Cell: "A1", Value: "after"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed.Revision != 2 || !changed.CanUndo {
+		t.Fatalf("history after edit = %#v", changed)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot := second.Snapshot(); snapshot.Revision != 2 || !snapshot.CanUndo {
+		t.Fatalf("reopened history = %#v", snapshot)
+	}
+	undone, err := second.RestoreHistory(2, "human", "undo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if undone.Revision != 3 || !undone.CanRedo {
+		t.Fatalf("history after durable undo = %#v", undone)
+	}
+	if err := second.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	third, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer third.Close()
+	if snapshot := third.Snapshot(); snapshot.Revision != 3 || !snapshot.CanRedo {
+		t.Fatalf("reopened redo history = %#v", snapshot)
+	}
+	redone, err := third.RestoreHistory(3, "human", "redo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if redone.Revision != 4 || !redone.CanUndo {
+		t.Fatalf("history after durable redo = %#v", redone)
+	}
+	value, err := third.ReadRange("Sheet1", "A1")
+	if err != nil || value.Rows[0][0].Value != "after" {
+		t.Fatalf("redo value = %#v, error = %v", value, err)
+	}
+}
+
+func TestExternalWorkbookReplacementResetsDurableHistory(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "book.xlsx")
+	file := excelize.NewFile()
+	if err := file.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+	_ = file.Close()
+
+	session, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := session.Apply(1, "human", []Operation{{Type: "set_cell", Sheet: "Sheet1", Cell: "A1", Value: "session"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := session.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	replacement := excelize.NewFile()
+	if err := replacement.SetCellValue("Sheet1", "A1", "external"); err != nil {
+		t.Fatal(err)
+	}
+	if err := replacement.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+	_ = replacement.Close()
+
+	reopened, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	snapshot := reopened.Snapshot()
+	if snapshot.Revision != 1 || snapshot.CanUndo || snapshot.CanRedo {
+		t.Fatalf("history after external replacement = %#v", snapshot)
 	}
 }

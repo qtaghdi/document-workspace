@@ -50,6 +50,46 @@ type ConditionalFormat struct {
 	Style    *CellStyle `json:"style,omitempty"`
 }
 
+type SheetObjects struct {
+	Sheet     string       `json:"sheet"`
+	Images    []SheetImage `json:"images,omitempty"`
+	Charts    []SheetChart `json:"charts,omitempty"`
+	Truncated bool         `json:"truncated,omitempty"`
+}
+
+type SheetImage struct {
+	ID       string `json:"id"`
+	Name     string `json:"name,omitempty"`
+	AltText  string `json:"altText,omitempty"`
+	MimeType string `json:"mimeType"`
+	Data     string `json:"data"`
+	Row      int    `json:"row"`
+	Column   int    `json:"column"`
+	OffsetX  int    `json:"offsetX,omitempty"`
+	OffsetY  int    `json:"offsetY,omitempty"`
+	Width    int    `json:"width"`
+	Height   int    `json:"height"`
+}
+
+type SheetChart struct {
+	ID      string        `json:"id"`
+	Title   string        `json:"title,omitempty"`
+	Type    string        `json:"type"`
+	Row     int           `json:"row"`
+	Column  int           `json:"column"`
+	OffsetX int           `json:"offsetX,omitempty"`
+	OffsetY int           `json:"offsetY,omitempty"`
+	Width   int           `json:"width"`
+	Height  int           `json:"height"`
+	Series  []ChartSeries `json:"series"`
+}
+
+type ChartSeries struct {
+	Name       string    `json:"name,omitempty"`
+	Categories []string  `json:"categories"`
+	Values     []float64 `json:"values"`
+}
+
 type Operation struct {
 	Type    string        `json:"type" jsonschema:"Operation type: set_cell, set_formula, paste_range, set_format, merge_cells, unmerge_cells, insert_rows, delete_rows, insert_columns, or delete_columns"`
 	Sheet   string        `json:"sheet" jsonschema:"Worksheet name"`
@@ -129,16 +169,17 @@ type SheetDimensions struct {
 }
 
 type Session struct {
-	mu          sync.RWMutex
-	id          string
-	path        string
-	file        *excelize.File
-	revision    uint64
-	sequence    uint64
-	history     []Event
-	subscribers map[chan Event]struct{}
-	dimensions  map[string]SheetDimensions
-	warnings    []FeatureWarning
-	undoHistory [][]byte
-	redoHistory [][]byte
+	mu           sync.RWMutex
+	id           string
+	path         string
+	file         *excelize.File
+	revision     uint64
+	sequence     uint64
+	history      []Event
+	subscribers  map[chan Event]struct{}
+	dimensions   map[string]SheetDimensions
+	warnings     []FeatureWarning
+	undoHistory  [][]byte
+	redoHistory  [][]byte
+	historyStore *historyStore
 }

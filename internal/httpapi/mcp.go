@@ -29,6 +29,10 @@ type readRangeInput struct {
 	Range string `json:"range" jsonschema:"A1-style range, for example A1:H40"`
 }
 
+type sheetInput struct {
+	Sheet string `json:"sheet" jsonschema:"Worksheet name"`
+}
+
 type eventPollInput struct {
 	AfterSequence uint64 `json:"afterSequence,omitempty" jsonschema:"Last processed event sequence, or zero for all retained events"`
 }
@@ -210,6 +214,16 @@ func (s *Server) mcpServer() *mcp.Server {
 	}, func(_ context.Context, _ *mcp.CallToolRequest, input eventPollInput) (*mcp.CallToolResult, eventPollResponse, error) {
 		events, snapshot := s.session.EventsAfter(input.AfterSequence)
 		return nil, eventPollResponse{Events: events, Workbook: snapshot}, nil
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_sheet_objects",
+		Title:       "Get Sheet Objects",
+		Description: "Read bounded image data and chart previews for MCP App rendering.",
+		Meta:        appOnlyMeta,
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &closedWorld},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, input sheetInput) (*mcp.CallToolResult, workbook.SheetObjects, error) {
+		objects, err := s.session.ReadSheetObjects(input.Sheet)
+		return nil, objects, err
 	})
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "apply_operations",
