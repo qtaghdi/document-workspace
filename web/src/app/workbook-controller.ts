@@ -4,12 +4,18 @@ import type {
   SelectionChange,
   WorkbookEvent,
   WorkbookOperation,
+  WorkbookSnapshot,
 } from '../contracts';
 import type { SpreadsheetEngine } from '../spreadsheet-engine';
+import { toA1Range } from '../spreadsheet/a1';
 import type { EventSubscription, WorkbookClient } from '../transport/workbook-client';
 import type { AppView } from '../ui/app-view';
 
 export type SpreadsheetEngineFactory = (container: HTMLElement) => SpreadsheetEngine;
+
+const maxRangeCells = 10_000;
+const maxInitialCellsPerSheet = 100_000;
+const maxInitialCellsPerWorkbook = 500_000;
 
 export class WorkbookController {
   private revision = 0;
@@ -29,12 +35,17 @@ export class WorkbookController {
     try {
       await this.client.connect();
       const snapshot = await this.client.getWorkbook();
-      const ranges = await Promise.all(
-        snapshot.sheets.map((sheet) => this.client.readRange(sheet, 'A1:AX200')),
-      );
+      const initialRanges = planInitialRanges(snapshot);
+      const ranges = [];
+      for (const ref of initialRanges.refs) {
+        ranges.push(await this.client.readRange(ref.sheet, ref.range));
+      }
       this.revision = snapshot.revision;
       this.view.setWorkbookName(snapshot.name);
-      this.view.showRevision('Ready', this.revision);
+      this.view.showRevision(
+        initialRanges.truncated ? 'Ready with a bounded initial data window' : 'Ready',
+        this.revision,
+      );
 
       this.engine = this.createEngine(this.view.spreadsheet);
       this.engine.initialize(snapshot, ranges);
@@ -115,4 +126,55 @@ export class WorkbookController {
     this.engine?.applyRemoteEvent(event);
     this.view.showAIPresence(event, this.revision);
   }
+}
+
+export function planInitialRanges(snapshot: WorkbookSnapshot): {
+  refs: Array<{ sheet: string; range: string }>;
+  truncated: boolean;
+} {
+  const refs: Array<{ sheet: string; range: string }> = [];
+  let workbookRemaining = maxInitialCellsPerWorkbook;
+  let truncated = false;
+
+  for (const sheet of snapshot.sheets) {
+    const dimensions = snapshot.sheetDimensions.find((candidate) => candidate.name === sheet);
+    const rows = Math.max(1, dimensions?.rows ?? 200);
+    const columns = Math.max(1, dimensions?.columns ?? 50);
+    let sheetRemaining = Math.min(maxInitialCellsPerSheet, workbookRemaining);
+    let loadedCells = 0;
+    let loadedForSheet = false;
+
+    for (let startColumn = 0; startColumn < columns && sheetRemaining > 0; startColumn += maxRangeCells) {
+      const width = Math.min(columns - startColumn, maxRangeCells);
+      const rowsPerRequest = Math.max(1, Math.floor(maxRangeCells / width));
+      for (let startRow = 0; startRow < rows && sheetRemaining > 0; startRow += rowsPerRequest) {
+        const height = Math.min(rows - startRow, rowsPerRequest, Math.floor(sheetRemaining / width));
+        if (height < 1) {
+          break;
+        }
+        refs.push({
+          sheet,
+          range: toA1Range(
+            startRow,
+            startColumn,
+            startRow + height - 1,
+            startColumn + width - 1,
+          ),
+        });
+        const loaded = height * width;
+        loadedCells += loaded;
+        sheetRemaining -= loaded;
+        workbookRemaining -= loaded;
+        loadedForSheet = true;
+      }
+    }
+    if (!loadedForSheet) {
+      refs.push({ sheet, range: 'A1' });
+    }
+    if (loadedCells < rows * columns) {
+      truncated = true;
+    }
+  }
+
+  return { refs, truncated };
 }

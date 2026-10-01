@@ -21,6 +21,11 @@ export const workbookSnapshotSchema = z.object({
   id: z.string(),
   name: z.string(),
   sheets: z.array(z.string()),
+  sheetDimensions: z.array(z.object({
+    name: z.string(),
+    rows: z.number().int().nonnegative(),
+    columns: z.number().int().nonnegative(),
+  })),
   revision: z.number().int().nonnegative(),
 });
 

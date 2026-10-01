@@ -110,6 +110,13 @@ animation are ephemeral. The adapter synchronizes confirmed cell edits,
 rectangular paste, basic formatting, merged cells, and committed AI edits. AI
 selections are rendered with Univer's OSS range highlight API.
 
+Workbook snapshots include sheet dimensions. The browser divides the initial
+used ranges into requests that stay within the server's range-size limit, then
+maps each range at its original row and column offset. Univer receives the full
+sheet dimensions so its grid remains virtualized even when the source contains
+more rows than the first visible viewport. An initial data budget prevents an
+unbounded workbook from forcing a full import into browser memory.
+
 Only Univer open-source packages are allowed. The Go service will provide
 collaboration, presence state, operation ordering, and XLSX persistence. The UI
 will render AI cursors and selections through an OSS adapter or a custom overlay.

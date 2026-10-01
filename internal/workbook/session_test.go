@@ -75,6 +75,41 @@ func TestReadRangeIncludesFormula(t *testing.T) {
 	}
 }
 
+func TestSnapshotReportsAndGrowsSheetDimensions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "book.xlsx")
+	file := excelize.NewFile()
+	if err := file.SetCellValue("Sheet1", "C250", "edge"); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+	_ = file.Close()
+
+	session, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	initial := session.Snapshot()
+	if len(initial.SheetDimensions) != 1 {
+		t.Fatalf("sheet dimensions = %#v", initial.SheetDimensions)
+	}
+	if got := initial.SheetDimensions[0]; got.Name != "Sheet1" || got.Rows != 250 || got.Columns != 3 {
+		t.Fatalf("initial dimensions = %#v", got)
+	}
+
+	updated, err := session.Apply(1, "ai", []Operation{{
+		Type: "set_cell", Sheet: "Sheet1", Cell: "D8148", Value: "expanded",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := updated.SheetDimensions[0]; got.Rows != 8148 || got.Columns != 4 {
+		t.Fatalf("updated dimensions = %#v", got)
+	}
+}
+
 func TestApplyPasteRangePersistsAsOneRevision(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "book.xlsx")
 	file := excelize.NewFile()

@@ -33,12 +33,18 @@ func Open(path string) (*Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open workbook: %w", err)
 	}
+	dimensions, err := inspectSheetDimensions(f)
+	if err != nil {
+		_ = f.Close()
+		return nil, err
+	}
 	return &Session{
 		id:          randomID(),
 		path:        abs,
 		file:        f,
 		revision:    1,
 		subscribers: make(map[chan Event]struct{}),
+		dimensions:  dimensions,
 	}, nil
 }
 
@@ -56,10 +62,11 @@ func (s *Session) Snapshot() Snapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return Snapshot{
-		ID:       s.id,
-		Name:     filepath.Base(s.path),
-		Sheets:   append([]string(nil), s.file.GetSheetList()...),
-		Revision: s.revision,
+		ID:              s.id,
+		Name:            filepath.Base(s.path),
+		Sheets:          append([]string(nil), s.file.GetSheetList()...),
+		SheetDimensions: s.sheetDimensionsLocked(),
+		Revision:        s.revision,
 	}
 }
 
@@ -133,6 +140,7 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 		return Snapshot{}, err
 	}
 	s.revision = nextRevision
+	s.growDimensionsLocked(operations)
 	for _, op := range operations {
 		if op.Type == "set_format" {
 			s.publishLocked(Event{Revision: s.revision, Actor: actor, Type: "range.format", Sheet: op.Sheet, Range: op.Range, Format: op.Format})
@@ -180,5 +188,11 @@ func (s *Session) hasSheet(name string) bool {
 }
 
 func (s *Session) snapshotLocked() Snapshot {
-	return Snapshot{ID: s.id, Name: filepath.Base(s.path), Sheets: append([]string(nil), s.file.GetSheetList()...), Revision: s.revision}
+	return Snapshot{
+		ID:              s.id,
+		Name:            filepath.Base(s.path),
+		Sheets:          append([]string(nil), s.file.GetSheetList()...),
+		SheetDimensions: s.sheetDimensionsLocked(),
+		Revision:        s.revision,
+	}
 }

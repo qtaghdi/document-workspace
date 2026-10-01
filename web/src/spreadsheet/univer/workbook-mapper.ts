@@ -35,7 +35,8 @@ export function toUniverWorkbook(
   const sheetOrder = snapshot.sheets.map((_, index) => `sheet-${index + 1}`);
   const sheets = Object.fromEntries(
     snapshot.sheets.map((name, index) => {
-      const range = ranges.find((candidate) => candidate.sheet === name);
+      const sheetRanges = ranges.filter((candidate) => candidate.sheet === name);
+      const dimensions = snapshot.sheetDimensions.find((candidate) => candidate.name === name);
       const id = sheetOrder[index];
       if (!id) {
         throw new Error(`Missing worksheet ID for ${name}`);
@@ -45,10 +46,10 @@ export function toUniverWorkbook(
         {
           id,
           name,
-          rowCount: Math.max(200, range?.rows.length ?? 0),
-          columnCount: 50,
-          cellData: toCellData(range),
-          mergeData: toMergeData(range?.merges ?? []),
+          rowCount: Math.max(200, dimensions?.rows ?? 0),
+          columnCount: Math.max(50, dimensions?.columns ?? 0),
+          cellData: toCellData(sheetRanges),
+          mergeData: toMergeData([...new Set(sheetRanges.flatMap((range) => range.merges ?? []))]),
         },
       ];
     }),
@@ -65,15 +66,15 @@ export function toUniverWorkbook(
   };
 }
 
-function toCellData(range: WorkbookRange | undefined): Record<number, Record<number, ICellData>> {
-  if (!range) {
-    return {};
-  }
-  return Object.fromEntries(
-    range.rows.map((row, rowIndex) => [
-      rowIndex,
-      Object.fromEntries(
-        row.map((cell, columnIndex) => {
+function toCellData(ranges: WorkbookRange[]): Record<number, Record<number, ICellData>> {
+  const result: Record<number, Record<number, ICellData>> = {};
+  for (const range of ranges) {
+    const [start = 'A1'] = range.ref.split(':');
+    const offset = parseCellAddress(start);
+    range.rows.forEach((row, rowIndex) => {
+      const targetRow = offset.row + rowIndex;
+      result[targetRow] ??= {};
+      row.forEach((cell, columnIndex) => {
           const data: ICellData = cell.formula
             ? { f: normalizeFormula(cell.formula) }
             : { v: cell.value };
@@ -88,11 +89,11 @@ function toCellData(range: WorkbookRange | undefined): Record<number, Record<num
               n: cell.style.numberFormat ? { pattern: cell.style.numberFormat } : undefined,
             };
           }
-          return [columnIndex, data];
-        }),
-      ),
-    ]),
-  );
+          result[targetRow]![offset.column + columnIndex] = data;
+      });
+    });
+  }
+  return result;
 }
 
 function toMergeData(merges: string[]): Array<{

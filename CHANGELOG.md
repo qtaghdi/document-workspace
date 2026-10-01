@@ -94,6 +94,8 @@ and this project intends to follow Semantic Versioning when releases begin.
 
 - Updated the browser revision after AI formatting and merge operations so the
   next human edit does not submit a stale base revision.
+- Loaded worksheet data in bounded range chunks using server-reported sheet
+  dimensions instead of limiting every sheet to the first 200 rows.
 
 ### Security
 

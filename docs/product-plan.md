@@ -43,8 +43,10 @@ Exit criteria:
 
 Status: in progress. Range paste, basic styles, merged cells, presence, and
 reconnect replay are implemented. The first generated XLSX compatibility corpus
-fixture is covered by an automated unrelated-edit round-trip test. Broader
-structural edits and producer-specific compatibility coverage remain.
+fixture is covered by an automated unrelated-edit round-trip test. Initial
+worksheet data now loads in bounded chunks using server-reported sheet
+dimensions. Broader structural edits, on-demand loading beyond the initial data
+budget, and producer-specific compatibility coverage remain.
 
 - Integrate Univer behind a replaceable `SpreadsheetEngine` boundary.
 - Bundle the TypeScript application with Vite and style the application shell

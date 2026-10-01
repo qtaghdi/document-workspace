@@ -83,10 +83,17 @@ type Presence struct {
 }
 
 type Snapshot struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	Sheets   []string `json:"sheets"`
-	Revision uint64   `json:"revision"`
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	Sheets          []string          `json:"sheets"`
+	SheetDimensions []SheetDimensions `json:"sheetDimensions"`
+	Revision        uint64            `json:"revision"`
+}
+
+type SheetDimensions struct {
+	Name    string `json:"name"`
+	Rows    int    `json:"rows"`
+	Columns int    `json:"columns"`
 }
 
 type Session struct {
@@ -98,4 +105,5 @@ type Session struct {
 	sequence    uint64
 	history     []Event
 	subscribers map[chan Event]struct{}
+	dimensions  map[string]SheetDimensions
 }

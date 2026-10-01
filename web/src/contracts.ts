@@ -2,7 +2,14 @@ export interface WorkbookSnapshot {
   id: string;
   name: string;
   sheets: string[];
+  sheetDimensions: SheetDimensions[];
   revision: number;
+}
+
+export interface SheetDimensions {
+  name: string;
+  rows: number;
+  columns: number;
 }
 
 export interface WorkbookCell {
