@@ -24,14 +24,34 @@ type CellStyle struct {
 }
 
 type Range struct {
-	Sheet  string   `json:"sheet"`
-	Ref    string   `json:"ref"`
-	Rows   [][]Cell `json:"rows"`
-	Merges []string `json:"merges,omitempty"`
+	Sheet                 string              `json:"sheet"`
+	Ref                   string              `json:"ref"`
+	Rows                  [][]Cell            `json:"rows"`
+	Merges                []string            `json:"merges,omitempty"`
+	Validations           []DataValidation    `json:"validations,omitempty"`
+	ConditionalFormatting []ConditionalFormat `json:"conditionalFormatting,omitempty"`
+}
+
+type DataValidation struct {
+	Range        string `json:"range"`
+	Type         string `json:"type"`
+	Operator     string `json:"operator,omitempty"`
+	Formula1     string `json:"formula1,omitempty"`
+	Formula2     string `json:"formula2,omitempty"`
+	AllowBlank   bool   `json:"allowBlank,omitempty"`
+	ShowDropDown bool   `json:"showDropDown,omitempty"`
+}
+
+type ConditionalFormat struct {
+	Range    string     `json:"range"`
+	Type     string     `json:"type"`
+	Criteria string     `json:"criteria,omitempty"`
+	Value    string     `json:"value,omitempty"`
+	Style    *CellStyle `json:"style,omitempty"`
 }
 
 type Operation struct {
-	Type    string        `json:"type" jsonschema:"Operation type: set_cell, set_formula, paste_range, set_format, merge_cells, or unmerge_cells"`
+	Type    string        `json:"type" jsonschema:"Operation type: set_cell, set_formula, paste_range, set_format, merge_cells, unmerge_cells, insert_rows, delete_rows, insert_columns, or delete_columns"`
 	Sheet   string        `json:"sheet" jsonschema:"Worksheet name"`
 	Cell    string        `json:"cell,omitempty" jsonschema:"A1-style cell address for a single-cell operation"`
 	Range   string        `json:"range,omitempty" jsonschema:"A1-style destination range for paste_range"`
@@ -39,6 +59,8 @@ type Operation struct {
 	Formula string        `json:"formula,omitempty" jsonschema:"Formula for set_formula, with or without a leading equals sign"`
 	Cells   [][]CellInput `json:"cells,omitempty" jsonschema:"Rectangular cell matrix for paste_range"`
 	Format  *CellFormat   `json:"format,omitempty" jsonschema:"Partial formatting for set_format"`
+	Index   int           `json:"index,omitempty" jsonschema:"One-based row or column index for a structural operation"`
+	Count   int           `json:"count,omitempty" jsonschema:"Number of rows or columns for a structural operation"`
 }
 
 type CellFormat struct {
@@ -74,6 +96,8 @@ type Event struct {
 	State    string       `json:"state,omitempty"`
 	Cells    []CellChange `json:"cells,omitempty"`
 	Format   *CellFormat  `json:"format,omitempty"`
+	Index    int          `json:"index,omitempty"`
+	Count    int          `json:"count,omitempty"`
 }
 
 type Presence struct {
@@ -87,7 +111,15 @@ type Snapshot struct {
 	Name            string            `json:"name"`
 	Sheets          []string          `json:"sheets"`
 	SheetDimensions []SheetDimensions `json:"sheetDimensions"`
+	Warnings        []FeatureWarning  `json:"warnings,omitempty"`
+	CanUndo         bool              `json:"canUndo"`
+	CanRedo         bool              `json:"canRedo"`
 	Revision        uint64            `json:"revision"`
+}
+
+type FeatureWarning struct {
+	Feature string `json:"feature"`
+	Message string `json:"message"`
 }
 
 type SheetDimensions struct {
@@ -106,4 +138,7 @@ type Session struct {
 	history     []Event
 	subscribers map[chan Event]struct{}
 	dimensions  map[string]SheetDimensions
+	warnings    []FeatureWarning
+	undoHistory [][]byte
+	redoHistory [][]byte
 }

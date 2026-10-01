@@ -67,6 +67,7 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /api/workbook", s.requireSession(http.HandlerFunc(s.getWorkbook)))
 	s.mux.Handle("GET /api/range", s.requireSession(http.HandlerFunc(s.getRange)))
 	s.mux.Handle("POST /api/operations", s.requireSession(http.HandlerFunc(s.applyOperations)))
+	s.mux.Handle("POST /api/history/{direction}", s.requireSession(http.HandlerFunc(s.restoreHistory)))
 	s.mux.Handle("POST /api/presence", s.requireSession(http.HandlerFunc(s.updatePresence)))
 	s.mux.Handle("GET /api/events", s.requireSession(http.HandlerFunc(s.events)))
 }

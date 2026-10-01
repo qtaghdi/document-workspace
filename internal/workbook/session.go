@@ -16,6 +16,8 @@ const maxRangeCells = 10_000
 const maxOperations = 1_000
 const maxEventHistory = 512
 const maxWorkbookBytes = 100 << 20
+const maxHistoryEntries = 10
+const maxHistorySnapshotBytes = 32 << 20
 
 func Open(path string) (*Session, error) {
 	abs, err := filepath.Abs(path)
@@ -38,6 +40,11 @@ func Open(path string) (*Session, error) {
 		_ = f.Close()
 		return nil, err
 	}
+	warnings, err := inspectFeatureWarnings(abs)
+	if err != nil {
+		_ = f.Close()
+		return nil, err
+	}
 	return &Session{
 		id:          randomID(),
 		path:        abs,
@@ -45,6 +52,7 @@ func Open(path string) (*Session, error) {
 		revision:    1,
 		subscribers: make(map[chan Event]struct{}),
 		dimensions:  dimensions,
+		warnings:    warnings,
 	}, nil
 }
 
@@ -66,6 +74,9 @@ func (s *Session) Snapshot() Snapshot {
 		Name:            filepath.Base(s.path),
 		Sheets:          append([]string(nil), s.file.GetSheetList()...),
 		SheetDimensions: s.sheetDimensionsLocked(),
+		Warnings:        append([]FeatureWarning(nil), s.warnings...),
+		CanUndo:         len(s.undoHistory) > 0,
+		CanRedo:         len(s.redoHistory) > 0,
 		Revision:        s.revision,
 	}
 }
@@ -87,6 +98,10 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 			return Snapshot{}, fmt.Errorf("operation %d: %w", i, err)
 		}
 	}
+	previous, historyErr := os.ReadFile(s.path)
+	if historyErr != nil {
+		return Snapshot{}, fmt.Errorf("capture workbook history: %w", historyErr)
+	}
 
 	nextRevision := s.revision + 1
 	for _, op := range operations {
@@ -94,7 +109,17 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 		if op.Range != "" {
 			selection = op.Range
 		}
+		if isStructuralOperation(op.Type) {
+			selection = structuralSelection(op)
+		}
 		s.publishLocked(Event{Revision: nextRevision, Actor: actor, Type: "presence.update", Sheet: op.Sheet, Range: selection, State: "editing"})
+		if isStructuralOperation(op.Type) {
+			if err := s.applyStructuralOperationLocked(op); err != nil {
+				s.reloadLocked()
+				return Snapshot{}, err
+			}
+			continue
+		}
 		if op.Type == "set_format" {
 			if err := s.applyFormatLocked(op); err != nil {
 				s.reloadLocked()
@@ -135,13 +160,31 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 			}
 		}
 	}
+	var structuralDimensions map[string]SheetDimensions
+	if containsStructuralOperation(operations) {
+		var dimensionsErr error
+		structuralDimensions, dimensionsErr = inspectSheetDimensions(s.file)
+		if dimensionsErr != nil {
+			s.reloadLocked()
+			return Snapshot{}, dimensionsErr
+		}
+	}
 	if err := s.persistLocked(); err != nil {
 		s.reloadLocked()
 		return Snapshot{}, err
 	}
 	s.revision = nextRevision
-	s.growDimensionsLocked(operations)
+	s.recordHistoryLocked(previous)
+	if structuralDimensions != nil {
+		s.dimensions = structuralDimensions
+	} else {
+		s.growDimensionsLocked(operations)
+	}
 	for _, op := range operations {
+		if isStructuralOperation(op.Type) {
+			s.publishLocked(Event{Revision: s.revision, Actor: actor, Type: "sheet." + op.Type, Sheet: op.Sheet, Index: op.Index, Count: op.Count})
+			continue
+		}
 		if op.Type == "set_format" {
 			s.publishLocked(Event{Revision: s.revision, Actor: actor, Type: "range.format", Sheet: op.Sheet, Range: op.Range, Format: op.Format})
 			continue
@@ -158,6 +201,85 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 		s.publishLocked(Event{Revision: s.revision, Actor: actor, Type: "cell.commit", Sheet: op.Sheet, Cell: op.Cell, Text: changeText(changes[0]), Cells: changes})
 	}
 	return s.snapshotLocked(), nil
+}
+
+func (s *Session) RestoreHistory(baseRevision uint64, actor, direction string) (Snapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if baseRevision != s.revision {
+		return Snapshot{}, fmt.Errorf("%w: expected %d, got %d", ErrRevisionConflict, s.revision, baseRevision)
+	}
+	var source *[][]byte
+	var destination *[][]byte
+	switch direction {
+	case "undo":
+		source, destination = &s.undoHistory, &s.redoHistory
+	case "redo":
+		source, destination = &s.redoHistory, &s.undoHistory
+	default:
+		return Snapshot{}, fmt.Errorf("unsupported history direction %q", direction)
+	}
+	if len(*source) == 0 {
+		return Snapshot{}, fmt.Errorf("nothing to %s", direction)
+	}
+	current, err := os.ReadFile(s.path)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("capture current workbook for %s: %w", direction, err)
+	}
+	targetIndex := len(*source) - 1
+	target := (*source)[targetIndex]
+	if err := s.replaceBytesLocked(target); err != nil {
+		return Snapshot{}, err
+	}
+	s.reloadLocked()
+	dimensions, err := inspectSheetDimensions(s.file)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	s.dimensions = dimensions
+	*source = (*source)[:targetIndex]
+	*destination = appendBoundedHistory(*destination, current)
+	s.revision++
+	s.publishLocked(Event{Revision: s.revision, Actor: actor, Type: "workbook.reload", State: direction})
+	return s.snapshotLocked(), nil
+}
+
+func (s *Session) recordHistoryLocked(previous []byte) {
+	s.redoHistory = nil
+	if len(previous) > maxHistorySnapshotBytes {
+		return
+	}
+	s.undoHistory = appendBoundedHistory(s.undoHistory, previous)
+}
+
+func appendBoundedHistory(history [][]byte, snapshot []byte) [][]byte {
+	if len(snapshot) > maxHistorySnapshotBytes {
+		return history
+	}
+	history = append(history, snapshot)
+	if len(history) > maxHistoryEntries {
+		history = append([][]byte(nil), history[len(history)-maxHistoryEntries:]...)
+	}
+	return history
+}
+
+func structuralSelection(operation Operation) string {
+	if operation.Type == "insert_columns" || operation.Type == "delete_columns" {
+		column, err := excelize.ColumnNumberToName(operation.Index)
+		if err == nil {
+			return column + "1"
+		}
+	}
+	return fmt.Sprintf("A%d", operation.Index)
+}
+
+func containsStructuralOperation(operations []Operation) bool {
+	for _, operation := range operations {
+		if isStructuralOperation(operation.Type) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Session) UpdatePresence(actor string, presence Presence) error {
@@ -193,6 +315,9 @@ func (s *Session) snapshotLocked() Snapshot {
 		Name:            filepath.Base(s.path),
 		Sheets:          append([]string(nil), s.file.GetSheetList()...),
 		SheetDimensions: s.sheetDimensionsLocked(),
+		Warnings:        append([]FeatureWarning(nil), s.warnings...),
+		CanUndo:         len(s.undoHistory) > 0,
+		CanRedo:         len(s.redoHistory) > 0,
 		Revision:        s.revision,
 	}
 }

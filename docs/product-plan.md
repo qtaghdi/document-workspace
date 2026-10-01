@@ -45,8 +45,11 @@ Status: in progress. Range paste, basic styles, merged cells, presence, and
 reconnect replay are implemented. The first generated XLSX compatibility corpus
 fixture is covered by an automated unrelated-edit round-trip test. Initial
 worksheet data now loads in bounded chunks using server-reported sheet
-dimensions. Broader structural edits, on-demand loading beyond the initial data
-budget, and producer-specific compatibility coverage remain.
+dimensions, then loads aligned tiles as the user scrolls. Row and column
+operations, bounded server-authoritative undo and redo, unsupported feature
+notices, and a LibreOffice-produced compatibility fixture are implemented.
+Editable browser mappings for advanced workbook objects and a Microsoft Excel
+fixture remain.
 
 - Integrate Univer behind a replaceable `SpreadsheetEngine` boundary.
 - Bundle the TypeScript application with Vite and style the application shell
@@ -60,8 +63,9 @@ budget, and producer-specific compatibility coverage remain.
 - Add keyboard navigation.
 - Add multi-cell copy and paste.
 - Add a formula bar.
-- Add row and column operations.
-- Add undo and redo backed by the operation log.
+- Add row and column operations. Complete.
+- Add undo and redo backed by bounded revision history. Complete for the local
+  session. Durable history across restarts remains.
 - Add distinct pending, committed, conflicted, and failed states.
 - Add accessible AI cursor and typing animation.
 
@@ -86,6 +90,8 @@ are implemented. Live host UI certification remains.
   return a single-use launch URL from `open_workbook`. Complete.
 - Reduce the self-contained Univer bundle before broad host certification.
   Complete for the initial target, from 12.7 MB to approximately 7.8 MB.
+  Validation and conditional formatting support currently bring it to about
+  8.1 MB before transport compression.
 - Verify Claude Desktop and Codex host behavior and document any capability
   differences. Claude Desktop Code and Codex stdio tools, approved writes,
   conflicts, and XLSX reopening are certified. The Codex loopback browser
@@ -124,12 +130,12 @@ are implemented. Live host UI certification remains.
 
 ## Immediate Next Work
 
-1. Add Microsoft Excel and LibreOffice fixtures to the XLSX compatibility
-   corpus.
-2. Add row and column operations with undo and redo records.
-3. Add unsupported feature detection and save warnings.
-4. Certify the loopback browser fallback and browser-originated edits in the
+1. Add a provenance-recorded Microsoft Excel fixture to the XLSX compatibility
+   corpus. LibreOffice coverage is complete.
+2. Extend the initial list validation and numeric conditional formatting
+   mappings, then add chart and image rendering.
+3. Certify the loopback browser fallback and browser-originated edits in the
    current Claude Desktop browser panel. Native embedded MCP App rendering
    remains pending in both hosts.
-5. Continue measuring startup cost and remove additional plugins only when the
+4. Continue measuring startup cost and remove additional plugins only when the
    editing workflow remains intact.

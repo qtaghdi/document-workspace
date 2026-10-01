@@ -10,6 +10,9 @@ import { UniverSheetsFormulaUIPlugin } from '@univerjs/sheets-formula-ui';
 import { UniverSheetsNumfmtPlugin } from '@univerjs/sheets-numfmt';
 import { UniverSheetsNumfmtUIPlugin } from '@univerjs/sheets-numfmt-ui';
 import { UniverSheetsUIPlugin } from '@univerjs/sheets-ui';
+import { UniverSheetsDataValidationPlugin } from '@univerjs/sheets-data-validation';
+import { UniverSheetsDataValidationUIPlugin } from '@univerjs/sheets-data-validation-ui';
+import { UniverSheetsConditionalFormattingPlugin } from '@univerjs/sheets-conditional-formatting';
 import { UniverUIPlugin } from '@univerjs/ui';
 import UniverPresetSheetsCoreEnUS from '@univerjs/preset-sheets-core/locales/en-US';
 
@@ -20,6 +23,8 @@ import '@univerjs/sheets-formula/facade';
 import '@univerjs/sheets-formula-ui/facade';
 import '@univerjs/sheets-numfmt/facade';
 import '@univerjs/sheets-ui/facade';
+import '@univerjs/sheets-data-validation/facade';
+import '@univerjs/sheets-conditional-formatting/facade';
 import '@univerjs/ui/facade';
 
 import type {
@@ -30,8 +35,10 @@ import type {
   WorkbookRange,
   WorkbookSnapshot,
   WorkbookOperation,
+  ViewportChange,
+  HistoryDirection,
 } from './contracts';
-import { toA1Range } from './spreadsheet/a1';
+import { parseCellAddress, toA1Range } from './spreadsheet/a1';
 import { formatAfterCommand } from './spreadsheet/univer/command-mapper';
 import {
   normalizeFormula,
@@ -48,10 +55,14 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
   private rangeEditListener: ((edit: RangeEdit) => void) | undefined;
   private selectionListener: ((selection: SelectionChange) => void) | undefined;
   private operationListener: ((operation: WorkbookOperation) => void) | undefined;
+  private viewportListener: ((viewport: ViewportChange) => void) | undefined;
+  private historyListener: ((direction: HistoryDirection) => void) | undefined;
   private readonly subscriptions: Array<{ dispose(): void }> = [];
   private remoteHighlight: { dispose(): void } | undefined;
   private remoteHighlightTimer: number | undefined;
   private applyingRemote = false;
+  private readonly appliedValidations = new Set<string>();
+  private readonly appliedConditionalFormats = new Set<string>();
 
   constructor(container: HTMLElement) {
     const { univer, univerAPI } = createUniver({
@@ -72,6 +83,9 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
         UniverSheetsNumfmtUIPlugin,
         UniverSheetsFormulaPlugin,
         UniverSheetsFormulaUIPlugin,
+        UniverSheetsDataValidationPlugin,
+        UniverSheetsDataValidationUIPlugin,
+        UniverSheetsConditionalFormattingPlugin,
       ],
     });
     this.univer = univer;
@@ -80,6 +94,9 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
 
   initialize(snapshot: WorkbookSnapshot, ranges: WorkbookRange[]): void {
     this.univerAPI.createWorkbook(toUniverWorkbook(snapshot, ranges));
+    for (const range of ranges) {
+      this.applyWorkbookFeatures(range);
+    }
     this.subscriptions.push(this.univerAPI.addEvent(
       this.univerAPI.Event.SheetEditEnded,
       ({ worksheet, row, column, isConfirm }) => {
@@ -97,14 +114,52 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
       },
     ));
     this.subscriptions.push(this.univerAPI.addEvent(
+      this.univerAPI.Event.BeforeUndo,
+      (event) => {
+        if (this.applyingRemote) return;
+        event.cancel = true;
+        this.historyListener?.('undo');
+      },
+    ));
+    this.subscriptions.push(this.univerAPI.addEvent(
+      this.univerAPI.Event.BeforeRedo,
+      (event) => {
+        if (this.applyingRemote) return;
+        event.cancel = true;
+        this.historyListener?.('redo');
+      },
+    ));
+    this.subscriptions.push(this.univerAPI.addEvent(
       this.univerAPI.Event.CommandExecuted,
-      ({ id }) => {
+      ({ id, params }) => {
         if (this.applyingRemote || !this.operationListener) {
           return;
         }
         const worksheet = this.univerAPI.getActiveWorkbook()?.getActiveSheet();
         const range = worksheet?.getActiveRange();
         if (!worksheet || !range) {
+          return;
+        }
+        const commandRange = commandParameterRange(params) ?? {
+          startRow: range.getRow(),
+          endRow: range.getRow() + range.getHeight() - 1,
+          startColumn: range.getColumn(),
+          endColumn: range.getColumn() + range.getWidth() - 1,
+        };
+        if (id === 'sheet.command.insert-row') {
+          this.operationListener({ type: 'insert_rows', sheet: worksheet.getSheetName(), index: commandRange.startRow + 1, count: commandRange.endRow - commandRange.startRow + 1 });
+          return;
+        }
+        if (id === 'sheet.command.remove-row') {
+          this.operationListener({ type: 'delete_rows', sheet: worksheet.getSheetName(), index: commandRange.startRow + 1, count: commandRange.endRow - commandRange.startRow + 1 });
+          return;
+        }
+        if (id === 'sheet.command.insert-col') {
+          this.operationListener({ type: 'insert_columns', sheet: worksheet.getSheetName(), index: commandRange.startColumn + 1, count: commandRange.endColumn - commandRange.startColumn + 1 });
+          return;
+        }
+        if (id === 'sheet.command.remove-col') {
+          this.operationListener({ type: 'delete_columns', sheet: worksheet.getSheetName(), index: commandRange.startColumn + 1, count: commandRange.endColumn - commandRange.startColumn + 1 });
           return;
         }
         if (id === 'sheet.command.add-worksheet-merge') {
@@ -124,6 +179,20 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
             format,
           });
         }
+      },
+    ));
+    this.subscriptions.push(this.univerAPI.addEvent(
+      this.univerAPI.Event.Scroll,
+      ({ worksheet }) => {
+        if (!this.viewportListener) {
+          return;
+        }
+        const state = worksheet.getScrollState();
+        this.viewportListener({
+          sheet: worksheet.getSheetName(),
+          row: state.sheetViewStartRow,
+          column: state.sheetViewStartColumn,
+        });
       },
     ));
     this.subscriptions.push(this.univerAPI.addEvent(
@@ -173,8 +242,87 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
     this.operationListener = listener;
   }
 
+  onViewportChange(listener: (viewport: ViewportChange) => void): void {
+    this.viewportListener = listener;
+  }
+
+  onHistoryAction(listener: (direction: HistoryDirection) => void): void {
+    this.historyListener = listener;
+  }
+
+  applyRange(source: WorkbookRange): void {
+    const worksheet = this.univerAPI.getActiveWorkbook()?.getSheetByName(source.sheet);
+    if (!worksheet) {
+      return;
+    }
+    const [start = 'A1'] = source.ref.split(':');
+    const offset = parseCellAddress(start);
+    this.applyingRemote = true;
+    try {
+      source.rows.forEach((row, rowOffset) => {
+        row.forEach((cell, columnOffset) => {
+          const target = worksheet.getRange(offset.row + rowOffset, offset.column + columnOffset);
+          if (cell.formula) {
+            target.setFormula(normalizeFormula(cell.formula));
+          } else {
+            target.setValueForCell(toUniverCellData(cell.value));
+          }
+          if (cell.style?.bold !== undefined) target.setFontWeight(cell.style.bold ? 'bold' : 'normal');
+          if (cell.style?.italic !== undefined) target.setFontStyle(cell.style.italic ? 'italic' : 'normal');
+          if (cell.style?.fontFamily) target.setFontFamily(cell.style.fontFamily);
+          if (cell.style?.fontSize) target.setFontSize(cell.style.fontSize);
+          if (cell.style?.fontColor) target.setFontColor(cell.style.fontColor);
+          if (cell.style?.fillColor) target.setBackgroundColor(cell.style.fillColor);
+          if (cell.style?.numberFormat) target.setNumberFormat(cell.style.numberFormat);
+        });
+      });
+      for (const merge of source.merges ?? []) {
+        worksheet.getRange(merge).merge({ defaultMerge: true, isForceMerge: true });
+      }
+      this.applyWorkbookFeatures(source);
+    } finally {
+      this.applyingRemote = false;
+    }
+  }
+
+  private applyWorkbookFeatures(source: WorkbookRange): void {
+    const worksheet = this.univerAPI.getActiveWorkbook()?.getSheetByName(source.sheet);
+    if (!worksheet) return;
+    for (const validation of source.validations ?? []) {
+      const key = `${source.sheet}!${validation.range}!${validation.type}!${validation.formula1 ?? ''}`;
+      if (this.appliedValidations.has(key) || validation.type !== 'list') continue;
+      const values = parseValidationList(validation.formula1 ?? '');
+      if (values.length === 0) continue;
+      const rule = this.univerAPI.newDataValidation()
+        .requireValueInList(values, false, validation.showDropDown !== false)
+        .setAllowBlank(validation.allowBlank ?? false)
+        .build();
+      worksheet.getRange(validation.range).setDataValidation(rule);
+      this.appliedValidations.add(key);
+    }
+    for (const format of source.conditionalFormatting ?? []) {
+      const key = `${source.sheet}!${format.range}!${format.type}!${format.criteria ?? ''}!${format.value ?? ''}`;
+      if (this.appliedConditionalFormats.has(key) || format.type !== 'cell') continue;
+      const value = Number(format.value);
+      if (!Number.isFinite(value)) continue;
+      const base = worksheet.newConditionalFormattingRule();
+      let builder;
+      if (format.criteria === '>') builder = base.whenNumberGreaterThan(value);
+      else if (format.criteria === '>=') builder = base.whenNumberGreaterThanOrEqualTo(value);
+      else if (format.criteria === '<') builder = base.whenNumberLessThan(value);
+      else if (format.criteria === '<=') builder = base.whenNumberLessThanOrEqualTo(value);
+      else if (format.criteria === '=') builder = base.whenNumberEqualTo(value);
+      else if (format.criteria === '!=') builder = base.whenNumberNotEqualTo(value);
+      else continue;
+      if (format.style?.fillColor) builder.setBackground(format.style.fillColor);
+      builder.setRanges([worksheet.getRange(format.range).getRange()]);
+      worksheet.addConditionalFormattingRule(builder.build());
+      this.appliedConditionalFormats.add(key);
+    }
+  }
+
   applyRemoteEvent(event: WorkbookEvent): void {
-    if (!event.sheet) {
+    if (!('sheet' in event) || !event.sheet) {
       return;
     }
     const workbook = this.univerAPI.getActiveWorkbook();
@@ -233,6 +381,24 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
       }
       return;
     }
+    if (
+      event.type === 'sheet.insert_rows' ||
+      event.type === 'sheet.delete_rows' ||
+      event.type === 'sheet.insert_columns' ||
+      event.type === 'sheet.delete_columns'
+    ) {
+      this.applyingRemote = true;
+      try {
+        const index = event.index - 1;
+        if (event.type === 'sheet.insert_rows') worksheet.insertRows(index, event.count);
+        if (event.type === 'sheet.delete_rows') worksheet.deleteRows(index, event.count);
+        if (event.type === 'sheet.insert_columns') worksheet.insertColumns(index, event.count);
+        if (event.type === 'sheet.delete_columns') worksheet.deleteColumns(index, event.count);
+      } finally {
+        this.applyingRemote = false;
+      }
+      return;
+    }
     if (event.type === 'cell.commit' && event.cell) {
       const change = event.cells?.[0];
       const range = worksheet.getRange(event.cell);
@@ -274,4 +440,31 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
     this.univer.dispose();
   }
 
+}
+
+function commandParameterRange(params: unknown): { startRow: number; endRow: number; startColumn: number; endColumn: number } | undefined {
+  if (!params || typeof params !== 'object' || !('range' in params)) {
+    return undefined;
+  }
+  const range = params.range;
+  if (!range || typeof range !== 'object') {
+    return undefined;
+  }
+  const candidate = range as Record<string, unknown>;
+  if (
+    typeof candidate.startRow !== 'number' ||
+    typeof candidate.endRow !== 'number' ||
+    typeof candidate.startColumn !== 'number' ||
+    typeof candidate.endColumn !== 'number'
+  ) {
+    return undefined;
+  }
+  return candidate as { startRow: number; endRow: number; startColumn: number; endColumn: number };
+}
+
+function parseValidationList(formula: string): string[] {
+  const normalized = formula.startsWith('"') && formula.endsWith('"')
+    ? formula.slice(1, -1).replaceAll('""', '"')
+    : formula;
+  return normalized.split(',').map((value) => value.trim()).filter(Boolean);
 }

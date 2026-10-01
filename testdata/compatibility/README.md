@@ -31,6 +31,21 @@ go run ./testdata/compatibility/generate
 Review the generated workbook and the compatibility assertions in the same
 change. Do not replace a fixture merely to accept an unexplained regression.
 
+### `libreoffice.xlsx`
+
+- Provenance: opened and exported by LibreOfficeDev 26.8.0.0.alpha0 using the Calc
+  Office Open XML filter on 2026-10-01.
+- Source: a disposable copy of `feature-rich.xlsx`.
+- Covered features: the subset of the baseline retained by LibreOffice,
+  including formulas, styles, merges, validation, conditional formatting,
+  drawings, links, names, and comments where supported by that producer.
+- Intended edit: an unrelated marker in `Z50` through `workbook.Session`.
+
+This fixture checks round-trip stability from a real LibreOffice producer. A
+Microsoft Excel fixture is still required. Do not label a generated or
+third-party workbook as Microsoft Excel output without recording the actual
+producer version and provenance.
+
 Run the corpus verification with:
 
 ```bash

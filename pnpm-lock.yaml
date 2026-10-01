@@ -33,6 +33,15 @@ catalogs:
     '@univerjs/sheets':
       specifier: 1.0.2
       version: 1.0.2
+    '@univerjs/sheets-conditional-formatting':
+      specifier: 1.0.2
+      version: 1.0.2
+    '@univerjs/sheets-data-validation':
+      specifier: 1.0.2
+      version: 1.0.2
+    '@univerjs/sheets-data-validation-ui':
+      specifier: 1.0.2
+      version: 1.0.2
     '@univerjs/sheets-formula':
       specifier: 1.0.2
       version: 1.0.2
@@ -91,6 +100,15 @@ importers:
       '@univerjs/sheets':
         specifier: 'catalog:'
         version: 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/sheets-conditional-formatting':
+        specifier: 'catalog:'
+        version: 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/sheets-data-validation':
+        specifier: 'catalog:'
+        version: 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/sheets-data-validation-ui':
+        specifier: 'catalog:'
+        version: 1.0.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rxjs@7.8.2)
       '@univerjs/sheets-formula':
         specifier: 'catalog:'
         version: 1.0.2(react@19.3.0)(rxjs@7.8.2)
@@ -963,6 +981,11 @@ packages:
     peerDependencies:
       rxjs: '>=7.0.0'
 
+  '@univerjs/data-validation@1.0.2':
+    resolution: {integrity: sha512-BTl94GFyH9VQXSNBWjygYSpgk1h4KMTbrzX6MR7CKy4oZ+2ozijd2xgy8oSM1/IPeyfrN+jiaoipP3CFbs1FOg==}
+    peerDependencies:
+      rxjs: '>=7.0.0'
+
   '@univerjs/design@1.0.2':
     resolution: {integrity: sha512-SP7S97I9JWzm0vzc0ix9JOtGwGS4/KvKAzy/+pz+f5yycK3eZbS3ptJQeRCJatR9SFJSA32hojifmm2voWF2VA==}
     peerDependencies:
@@ -1021,6 +1044,22 @@ packages:
 
   '@univerjs/rpc@1.0.2':
     resolution: {integrity: sha512-CY+/WV35XM1QxvfPVL3KdkDXtKrGwSqLxrYsuk7BToaa2vzPad8h0HMxXrjZZb8TcG7y4tA5KgDDbViSKFSHjw==}
+    peerDependencies:
+      rxjs: '>=7.0.0'
+
+  '@univerjs/sheets-conditional-formatting@1.0.2':
+    resolution: {integrity: sha512-gpFOV0TT1Q3CiP4RdXnZz/mGBPTUtViZ3+tns3Kb/Zdm7KlRg8BXrukzyNcrq9m3c8G5lNEkJUP10AkK4SEo6Q==}
+    peerDependencies:
+      rxjs: '>=7.0.0'
+
+  '@univerjs/sheets-data-validation-ui@1.0.2':
+    resolution: {integrity: sha512-C/Fq335uO6UNGDKertLBDnfcwugyqJ83waoVfg9JpMWeJShVvhPlSCi+o4Umi9oSNEpG91gpyc7veiYQxHFEqA==}
+    peerDependencies:
+      react: ^16.9.0 || ^17.0.0 || ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+      rxjs: '>=7.0.0'
+
+  '@univerjs/sheets-data-validation@1.0.2':
+    resolution: {integrity: sha512-+Bh98wWoJY5Ze+nQZcorURBbptg1jC4dOaW31uaxCorWWQuSODtIMoalEi0zejoUjNawJe6P4+RgXPAZxpcohg==}
     peerDependencies:
       rxjs: '>=7.0.0'
 
@@ -2181,6 +2220,13 @@ snapshots:
     transitivePeerDependencies:
       - react
 
+  '@univerjs/data-validation@1.0.2(react@19.3.0)(rxjs@7.8.2)':
+    dependencies:
+      '@univerjs/core': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      rxjs: 7.8.2
+    transitivePeerDependencies:
+      - react
+
   '@univerjs/design@1.0.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
       '@radix-ui/react-dialog': 1.1.23(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -2311,6 +2357,49 @@ snapshots:
   '@univerjs/rpc@1.0.2(react@19.3.0)(rxjs@7.8.2)':
     dependencies:
       '@univerjs/core': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      rxjs: 7.8.2
+    transitivePeerDependencies:
+      - react
+
+  '@univerjs/sheets-conditional-formatting@1.0.2(react@19.3.0)(rxjs@7.8.2)':
+    dependencies:
+      '@univerjs/core': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/engine-formula': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/engine-render': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/sheets': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      rxjs: 7.8.2
+    transitivePeerDependencies:
+      - react
+
+  '@univerjs/sheets-data-validation-ui@1.0.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rxjs@7.8.2)':
+    dependencies:
+      '@univerjs/core': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/data-validation': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/design': 1.0.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@univerjs/engine-formula': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/engine-render': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/icons': 1.43.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@univerjs/sheets': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/sheets-data-validation': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/sheets-formula-ui': 1.0.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/sheets-numfmt': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/sheets-ui': 1.0.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/ui': 1.0.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rxjs@7.8.2)
+      react: 19.3.0
+      rxjs: 7.8.2
+    transitivePeerDependencies:
+      - '@types/react'
+      - '@types/react-dom'
+      - react-dom
+
+  '@univerjs/sheets-data-validation@1.0.2(react@19.3.0)(rxjs@7.8.2)':
+    dependencies:
+      '@univerjs/core': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/data-validation': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/engine-formula': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/protocol': 1.0.2
+      '@univerjs/sheets': 1.0.2(react@19.3.0)(rxjs@7.8.2)
+      '@univerjs/sheets-formula': 1.0.2(react@19.3.0)(rxjs@7.8.2)
       rxjs: 7.8.2
     transitivePeerDependencies:
       - react

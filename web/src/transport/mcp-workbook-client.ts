@@ -1,7 +1,7 @@
 import { App, PostMessageTransport } from '@modelcontextprotocol/ext-apps';
 import type { z } from 'zod';
 
-import type { SelectionChange, WorkbookEvent, WorkbookOperation } from '../contracts';
+import type { HistoryDirection, SelectionChange, WorkbookEvent, WorkbookOperation } from '../contracts';
 import {
   applyResponseSchema,
   eventPollResponseSchema,
@@ -33,6 +33,10 @@ export class MCPWorkbookClient implements WorkbookClient {
 
   async applyOperations(baseRevision: number, operations: WorkbookOperation[]) {
     return this.callTool('apply_user_operations', { baseRevision, operations }, applyResponseSchema);
+  }
+
+  async restoreHistory(baseRevision: number, direction: HistoryDirection) {
+    return this.callTool('restore_user_history', { baseRevision, direction }, applyResponseSchema);
   }
 
   async updatePresence(selection: SelectionChange): Promise<void> {

@@ -29,6 +29,10 @@ The Go service exposes:
 - an SSE event stream used to visualize AI edits;
 - live human and AI selection presence with reconnect replay;
 - atomic range paste, basic formatting, and merge operations;
+- row and column insertion and deletion;
+- bounded server-authoritative undo and redo;
+- viewport-triggered range loading for large worksheets;
+- compatibility notices for preserved features that are not fully rendered;
 - revision checks and atomic XLSX saves.
 
 Run it with an existing workbook:
@@ -68,10 +72,11 @@ Available MCP tools:
 - `get_workbook`
 - `read_range`
 - `apply_operations`
+- `restore_history`
 - `update_presence`
 
-The embedded app uses app-only `get_events`, `apply_user_operations`, and
-`update_user_presence` tools for its bridge. Clients without MCP Apps can use
+The embedded app uses app-only `get_events`, `apply_user_operations`,
+`restore_user_history`, and `update_user_presence` tools for its bridge. Clients without MCP Apps can use
 the ordinary workbook tools and the standalone browser URL.
 
 Example operation payload:
@@ -109,7 +114,9 @@ Go binary. Vite emits a code-split standalone browser build and a self-contained
 `app.html` for MCP App hosts. Generated assets and `app.html` are ignored by
 Git. Use `make build`, rather than a standalone `go build`, when producing a
 release binary. The MCP App build removes unused non-English hyphenation data
-and is approximately 7.8 MB before transport compression. React is not required.
+and is approximately 8.1 MB before transport compression after adding data
+validation and conditional formatting support. React is not required by this
+application.
 
 Run a workbook locally:
 

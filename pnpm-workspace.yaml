@@ -15,6 +15,9 @@ catalog:
   '@univerjs/preset-sheets-core': 1.0.2
   '@univerjs/presets': 1.0.2
   '@univerjs/sheets': 1.0.2
+  '@univerjs/sheets-conditional-formatting': 1.0.2
+  '@univerjs/sheets-data-validation': 1.0.2
+  '@univerjs/sheets-data-validation-ui': 1.0.2
   '@univerjs/sheets-formula': 1.0.2
   '@univerjs/sheets-formula-ui': 1.0.2
   '@univerjs/sheets-numfmt': 1.0.2

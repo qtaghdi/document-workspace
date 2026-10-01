@@ -15,6 +15,10 @@ func (s *Session) persistLocked() error {
 	if err != nil {
 		return fmt.Errorf("serialize workbook: %w", err)
 	}
+	return s.replaceBytesLocked(buffer.Bytes())
+}
+
+func (s *Session) replaceBytesLocked(content []byte) error {
 	dir := filepath.Dir(s.path)
 	tmp, err := os.CreateTemp(dir, ".xlsx-viewer-*.tmp")
 	if err != nil {
@@ -25,7 +29,7 @@ func (s *Session) persistLocked() error {
 	if info, statErr := os.Stat(s.path); statErr == nil {
 		_ = tmp.Chmod(info.Mode())
 	}
-	if _, err = tmp.Write(buffer.Bytes()); err == nil {
+	if _, err = tmp.Write(content); err == nil {
 		err = tmp.Sync()
 	}
 	if closeErr := tmp.Close(); err == nil {

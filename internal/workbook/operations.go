@@ -9,11 +9,27 @@ import (
 )
 
 func (s *Session) validateOperation(op Operation) error {
-	if op.Type != "set_cell" && op.Type != "set_formula" && op.Type != "paste_range" && op.Type != "set_format" && op.Type != "merge_cells" && op.Type != "unmerge_cells" {
+	if op.Type != "set_cell" && op.Type != "set_formula" && op.Type != "paste_range" && op.Type != "set_format" && op.Type != "merge_cells" && op.Type != "unmerge_cells" && !isStructuralOperation(op.Type) {
 		return fmt.Errorf("unsupported type %q", op.Type)
 	}
 	if !s.hasSheet(op.Sheet) {
 		return fmt.Errorf("unknown sheet %q", op.Sheet)
+	}
+	if isStructuralOperation(op.Type) {
+		if op.Index < 1 {
+			return errors.New("structural operation index must be at least 1")
+		}
+		if op.Count < 1 || op.Count > 1_000 {
+			return errors.New("structural operation count must be between 1 and 1000")
+		}
+		limit := 1_048_576
+		if op.Type == "insert_columns" || op.Type == "delete_columns" {
+			limit = 16_384
+		}
+		if op.Index+op.Count-1 > limit {
+			return fmt.Errorf("structural operation exceeds worksheet limit %d", limit)
+		}
+		return nil
 	}
 	if op.Type == "paste_range" {
 		_, _, width, height, err := parseRange(op.Range)
@@ -52,6 +68,49 @@ func (s *Session) validateOperation(op Operation) error {
 	}
 	if op.Type == "set_formula" && op.Formula == "" {
 		return errors.New("formula is required")
+	}
+	return nil
+}
+
+func isStructuralOperation(operationType string) bool {
+	switch operationType {
+	case "insert_rows", "delete_rows", "insert_columns", "delete_columns":
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Session) applyStructuralOperationLocked(op Operation) error {
+	var err error
+	switch op.Type {
+	case "insert_rows":
+		err = s.file.InsertRows(op.Sheet, op.Index, op.Count)
+	case "delete_rows":
+		for range op.Count {
+			if err = s.file.RemoveRow(op.Sheet, op.Index); err != nil {
+				break
+			}
+		}
+	case "insert_columns":
+		column, columnErr := excelize.ColumnNumberToName(op.Index)
+		if columnErr != nil {
+			return fmt.Errorf("resolve column %d: %w", op.Index, columnErr)
+		}
+		err = s.file.InsertCols(op.Sheet, column, op.Count)
+	case "delete_columns":
+		column, columnErr := excelize.ColumnNumberToName(op.Index)
+		if columnErr != nil {
+			return fmt.Errorf("resolve column %d: %w", op.Index, columnErr)
+		}
+		for range op.Count {
+			if err = s.file.RemoveCol(op.Sheet, column); err != nil {
+				break
+			}
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("apply %s at %s index %d: %w", op.Type, op.Sheet, op.Index, err)
 	}
 	return nil
 }

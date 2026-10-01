@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 
-import type { SelectionChange, WorkbookEvent, WorkbookOperation } from '../contracts';
+import type { HistoryDirection, SelectionChange, WorkbookEvent, WorkbookOperation } from '../contracts';
 import {
   applyResponseSchema,
   errorResponseSchema,
@@ -37,6 +37,14 @@ export class HTTPWorkbookClient implements WorkbookClient {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ baseRevision, operations }),
+    });
+  }
+
+  async restoreHistory(baseRevision: number, direction: HistoryDirection) {
+    return requestJSON(`/api/history/${direction}`, applyResponseSchema, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baseRevision }),
     });
   }
 

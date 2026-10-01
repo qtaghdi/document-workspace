@@ -4,6 +4,7 @@ import type {
   WorkbookOperation,
   WorkbookRange,
   WorkbookSnapshot,
+  HistoryDirection,
 } from '../contracts';
 
 export interface ApplyResponse {
@@ -21,6 +22,7 @@ export interface WorkbookClient {
   getWorkbook(): Promise<WorkbookSnapshot>;
   readRange(sheet: string, range: string): Promise<WorkbookRange>;
   applyOperations(baseRevision: number, operations: WorkbookOperation[]): Promise<ApplyResponse>;
+  restoreHistory(baseRevision: number, direction: HistoryDirection): Promise<ApplyResponse>;
   updatePresence(selection: SelectionChange): Promise<void>;
   subscribe(onEvent: (event: WorkbookEvent) => void): EventSubscription;
 }

@@ -3,7 +3,15 @@ export interface WorkbookSnapshot {
   name: string;
   sheets: string[];
   sheetDimensions: SheetDimensions[];
+  warnings?: FeatureWarning[];
+  canUndo: boolean;
+  canRedo: boolean;
   revision: number;
+}
+
+export interface FeatureWarning {
+  feature: string;
+  message: string;
 }
 
 export interface SheetDimensions {
@@ -36,6 +44,26 @@ export interface WorkbookRange {
   ref: string;
   rows: WorkbookCell[][];
   merges?: string[];
+  validations?: DataValidation[];
+  conditionalFormatting?: ConditionalFormat[];
+}
+
+export interface DataValidation {
+  range: string;
+  type: string;
+  operator?: string;
+  formula1?: string;
+  formula2?: string;
+  allowBlank?: boolean;
+  showDropDown?: boolean;
+}
+
+export interface ConditionalFormat {
+  range: string;
+  type: string;
+  criteria?: string;
+  value?: string;
+  style?: CellStyle;
 }
 
 interface CellOperation {
@@ -62,7 +90,8 @@ export type WorkbookOperation =
   | (CellOperation & { type: 'set_formula'; formula: string })
   | (RangeOperation & { type: 'paste_range'; cells: CellInput[][] })
   | (RangeOperation & { type: 'set_format'; format: CellFormat })
-  | (RangeOperation & { type: 'merge_cells' | 'unmerge_cells' });
+  | (RangeOperation & { type: 'merge_cells' | 'unmerge_cells' })
+  | { type: 'insert_rows' | 'delete_rows' | 'insert_columns' | 'delete_columns'; sheet: string; index: number; count: number };
 
 interface EventBase {
   sequence: number;
@@ -71,6 +100,10 @@ interface EventBase {
 }
 
 export type WorkbookEvent =
+  | (EventBase & {
+      type: 'workbook.reload';
+      state: 'undo' | 'redo';
+    })
   | (EventBase & {
       type: 'presence.update';
       sheet: string;
@@ -106,6 +139,12 @@ export type WorkbookEvent =
       type: 'range.merge_cells' | 'range.unmerge_cells';
       sheet: string;
       range: string;
+    })
+  | (EventBase & {
+      type: 'sheet.insert_rows' | 'sheet.delete_rows' | 'sheet.insert_columns' | 'sheet.delete_columns';
+      sheet: string;
+      index: number;
+      count: number;
     });
 
 export interface CellEdit {
@@ -126,3 +165,11 @@ export interface SelectionChange {
   range: string;
   state: 'selecting' | 'editing' | 'idle';
 }
+
+export interface ViewportChange {
+  sheet: string;
+  row: number;
+  column: number;
+}
+
+export type HistoryDirection = 'undo' | 'redo';

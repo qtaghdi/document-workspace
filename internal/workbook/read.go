@@ -56,7 +56,65 @@ func (s *Session) ReadRange(sheet, ref string) (Range, error) {
 	if err != nil {
 		return Range{}, err
 	}
-	return Range{Sheet: sheet, Ref: ref, Rows: rows, Merges: merges}, nil
+	validations, err := s.validationsInRange(sheet, c1, r1, c2, r2)
+	if err != nil {
+		return Range{}, err
+	}
+	conditionalFormatting, err := s.conditionalFormattingInRange(sheet, c1, r1, c2, r2)
+	if err != nil {
+		return Range{}, err
+	}
+	return Range{Sheet: sheet, Ref: ref, Rows: rows, Merges: merges, Validations: validations, ConditionalFormatting: conditionalFormatting}, nil
+}
+
+func (s *Session) validationsInRange(sheet string, c1, r1, c2, r2 int) ([]DataValidation, error) {
+	items, err := s.file.GetDataValidations(sheet)
+	if err != nil {
+		return nil, fmt.Errorf("read data validations for %s: %w", sheet, err)
+	}
+	result := make([]DataValidation, 0)
+	for _, item := range items {
+		for _, ref := range strings.Fields(item.Sqref) {
+			if rangeIntersects(ref, c1, r1, c2, r2) {
+				result = append(result, DataValidation{Range: ref, Type: item.Type, Operator: item.Operator, Formula1: item.Formula1, Formula2: item.Formula2, AllowBlank: item.AllowBlank, ShowDropDown: item.ShowDropDown})
+			}
+		}
+	}
+	return result, nil
+}
+
+func (s *Session) conditionalFormattingInRange(sheet string, c1, r1, c2, r2 int) ([]ConditionalFormat, error) {
+	formats, err := s.file.GetConditionalFormats(sheet)
+	if err != nil {
+		return nil, fmt.Errorf("read conditional formatting for %s: %w", sheet, err)
+	}
+	result := make([]ConditionalFormat, 0)
+	for ref, options := range formats {
+		if !rangeIntersects(ref, c1, r1, c2, r2) {
+			continue
+		}
+		for _, option := range options {
+			item := ConditionalFormat{Range: ref, Type: option.Type, Criteria: option.Criteria, Value: option.Value}
+			if option.Format != nil {
+				style, styleErr := s.file.GetConditionalStyle(*option.Format)
+				if styleErr != nil {
+					return nil, fmt.Errorf("read conditional style for %s!%s: %w", sheet, ref, styleErr)
+				}
+				item.Style = cellStyleFromExcelize(style)
+			}
+			result = append(result, item)
+		}
+	}
+	return result, nil
+}
+
+func rangeIntersects(ref string, c1, r1, c2, r2 int) bool {
+	rc1, rr1, width, height, err := parseRange(ref)
+	if err != nil {
+		return false
+	}
+	rc2, rr2 := rc1+width-1, rr1+height-1
+	return rc1 <= c2 && rc2 >= c1 && rr1 <= r2 && rr2 >= r1
 }
 
 func (s *Session) readCellStyle(sheet, cell string) (*CellStyle, error) {
@@ -71,6 +129,10 @@ func (s *Session) readCellStyle(sheet, cell string) (*CellStyle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read style definition %s!%s: %w", sheet, cell, err)
 	}
+	return cellStyleFromExcelize(style), nil
+}
+
+func cellStyleFromExcelize(style *excelize.Style) *CellStyle {
 	result := &CellStyle{}
 	if style.CustomNumFmt != nil {
 		result.NumberFormat = *style.CustomNumFmt
@@ -85,7 +147,7 @@ func (s *Session) readCellStyle(sheet, cell string) (*CellStyle, error) {
 	if len(style.Fill.Color) > 0 {
 		result.FillColor = cssColor(style.Fill.Color[0])
 	}
-	return result, nil
+	return result
 }
 
 func (s *Session) mergesInRange(sheet string, c1, r1, c2, r2 int) ([]string, error) {

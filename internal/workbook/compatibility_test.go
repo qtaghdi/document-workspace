@@ -33,11 +33,25 @@ type compatibilityInventory struct {
 }
 
 func TestCompatibilityCorpusPreservesUnrelatedFeatures(t *testing.T) {
-	source := compatibilityFixturePath(t, "feature-rich.xlsx")
-	before := inspectCompatibilityWorkbook(t, source)
-	assertCompatibilityBaseline(t, before)
+	fixtures := []string{"feature-rich.xlsx", "libreoffice.xlsx"}
+	for _, fixture := range fixtures {
+		t.Run(fixture, func(t *testing.T) {
+			verifyCompatibilityFixture(t, fixture)
+		})
+	}
+}
 
-	target := filepath.Join(t.TempDir(), "feature-rich.xlsx")
+func verifyCompatibilityFixture(t *testing.T, fixture string) {
+	t.Helper()
+	source := compatibilityFixturePath(t, fixture)
+	before := inspectCompatibilityWorkbook(t, source)
+	if fixture == "feature-rich.xlsx" {
+		assertCompatibilityBaseline(t, before)
+	} else if before.Formula == "" || len(before.Merges) == 0 || !strings.Contains(before.Style, "bold=true") {
+		t.Fatalf("producer fixture is missing core compatibility features: %#v", before)
+	}
+
+	target := filepath.Join(t.TempDir(), fixture)
 	contents, err := os.ReadFile(source)
 	if err != nil {
 		t.Fatal(err)

@@ -166,6 +166,25 @@ func (s *Server) mcpServer() *mcp.Server {
 		}, err
 	})
 	mcp.AddTool(server, &mcp.Tool{
+		Name:        "restore_history",
+		Title:       "Undo or Redo Workbook Change",
+		Description: "Undo or redo one committed workbook revision. Pass the latest baseRevision and direction.",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: &destructive, OpenWorldHint: &closedWorld},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, input historyInput) (*mcp.CallToolResult, applyResponse, error) {
+		snapshot, err := s.session.RestoreHistory(input.BaseRevision, "ai", input.Direction)
+		return nil, applyResponse{Workbook: snapshot, Applied: 1}, err
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "restore_user_history",
+		Title:       "Undo or Redo User Workbook Change",
+		Description: "Undo or redo one committed workbook revision for the MCP App user.",
+		Meta:        appOnlyMeta,
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: &destructive, OpenWorldHint: &closedWorld},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, input historyInput) (*mcp.CallToolResult, applyResponse, error) {
+		snapshot, err := s.session.RestoreHistory(input.BaseRevision, "human", input.Direction)
+		return nil, applyResponse{Workbook: snapshot, Applied: 1}, err
+	})
+	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_workbook",
 		Title:       "Get Workbook",
 		Description: "Get the open workbook name, sheets, and current revision before reading or editing it.",

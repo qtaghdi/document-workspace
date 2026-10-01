@@ -67,6 +67,16 @@ and this project intends to follow Semantic Versioning when releases begin.
   formatting, drawings, links, names, and comments.
 - Added a repository-local `xlsx-compatibility-qa` skill for safe corpus-based
   workbook compatibility verification.
+- Added row and column insertion and deletion across MCP, HTTP, realtime events,
+  XLSX persistence, and the Univer UI.
+- Added bounded server-authoritative undo and redo with atomic package restore
+  and revision reload events.
+- Added viewport-triggered range loading beyond the initial browser data budget.
+- Added compatibility detection and browser notices for charts, images,
+  conditional formatting, data validation, external links, and macros.
+- Added OSS Univer rendering for XLSX list validation and numeric conditional
+  formatting rules loaded from the Go workbook adapter.
+- Added a LibreOffice-produced workbook fixture to the compatibility corpus.
 
 ### Changed
 

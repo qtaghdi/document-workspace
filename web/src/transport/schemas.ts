@@ -26,6 +26,12 @@ export const workbookSnapshotSchema = z.object({
     rows: z.number().int().nonnegative(),
     columns: z.number().int().nonnegative(),
   })),
+  warnings: z.array(z.object({
+    feature: z.string(),
+    message: z.string(),
+  })).optional(),
+  canUndo: z.boolean(),
+  canRedo: z.boolean(),
   revision: z.number().int().nonnegative(),
 });
 
@@ -39,6 +45,15 @@ export const workbookRangeSchema = z.object({
     style: cellStyleSchema.optional(),
   }))),
   merges: z.array(z.string()).optional(),
+  validations: z.array(z.object({
+    range: z.string(), type: z.string(), operator: z.string().optional(),
+    formula1: z.string().optional(), formula2: z.string().optional(),
+    allowBlank: z.boolean().optional(), showDropDown: z.boolean().optional(),
+  })).optional(),
+  conditionalFormatting: z.array(z.object({
+    range: z.string(), type: z.string(), criteria: z.string().optional(),
+    value: z.string().optional(), style: cellStyleSchema.optional(),
+  })).optional(),
 });
 
 const eventBase = {
@@ -48,6 +63,11 @@ const eventBase = {
 };
 
 export const workbookEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    ...eventBase,
+    type: z.literal('workbook.reload'),
+    state: z.enum(['undo', 'redo']),
+  }),
   z.object({
     ...eventBase,
     type: z.literal('presence.update'),
@@ -89,6 +109,18 @@ export const workbookEventSchema = z.discriminatedUnion('type', [
     type: z.union([z.literal('range.merge_cells'), z.literal('range.unmerge_cells')]),
     sheet: z.string(),
     range: z.string(),
+  }),
+  z.object({
+    ...eventBase,
+    type: z.union([
+      z.literal('sheet.insert_rows'),
+      z.literal('sheet.delete_rows'),
+      z.literal('sheet.insert_columns'),
+      z.literal('sheet.delete_columns'),
+    ]),
+    sheet: z.string(),
+    index: z.number().int().positive(),
+    count: z.number().int().positive(),
   }),
 ]);
 

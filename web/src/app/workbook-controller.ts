@@ -2,12 +2,15 @@ import type {
   CellEdit,
   RangeEdit,
   SelectionChange,
+  ViewportChange,
+  HistoryDirection,
   WorkbookEvent,
   WorkbookOperation,
   WorkbookSnapshot,
 } from '../contracts';
 import type { SpreadsheetEngine } from '../spreadsheet-engine';
 import { toA1Range } from '../spreadsheet/a1';
+import { parseCellAddress } from '../spreadsheet/a1';
 import type { EventSubscription, WorkbookClient } from '../transport/workbook-client';
 import type { AppView } from '../ui/app-view';
 
@@ -24,6 +27,11 @@ export class WorkbookController {
   private pendingSelection: SelectionChange | undefined;
   private eventSubscription: EventSubscription | undefined;
   private engine: SpreadsheetEngine | undefined;
+  private snapshot: WorkbookSnapshot | undefined;
+  private readonly loadedRanges = new Map<string, LoadedRectangle[]>();
+  private readonly pendingRangeLoads = new Set<string>();
+  private viewportTimer: number | undefined;
+  private pendingViewport: ViewportChange | undefined;
 
   constructor(
     private readonly client: WorkbookClient,
@@ -35,6 +43,7 @@ export class WorkbookController {
     try {
       await this.client.connect();
       const snapshot = await this.client.getWorkbook();
+      this.snapshot = snapshot;
       const initialRanges = planInitialRanges(snapshot);
       const ranges = [];
       for (const ref of initialRanges.refs) {
@@ -42,6 +51,9 @@ export class WorkbookController {
       }
       this.revision = snapshot.revision;
       this.view.setWorkbookName(snapshot.name);
+      this.view.showWarnings(snapshot.warnings ?? []);
+      this.view.setHistoryState(snapshot.canUndo, snapshot.canRedo);
+      this.view.onHistoryAction((direction) => this.queueHistoryAction(direction));
       this.view.showRevision(
         initialRanges.truncated ? 'Ready with a bounded initial data window' : 'Ready',
         this.revision,
@@ -53,6 +65,11 @@ export class WorkbookController {
       this.engine.onRangeEdit((edit) => this.queueRangeEdit(edit));
       this.engine.onSelectionChange((selection) => this.queuePresence(selection));
       this.engine.onOperation((operation) => this.queueOperation(operation));
+      this.engine.onViewportChange((viewport) => this.queueViewportLoad(viewport));
+      this.engine.onHistoryAction((direction) => this.queueHistoryAction(direction));
+      for (const range of ranges) {
+        this.recordLoadedRange(range.sheet, range.ref);
+      }
       this.eventSubscription = this.client.subscribe((event) => this.handleWorkbookEvent(event));
       this.eventSubscription.onerror = () => {
         this.view.showRevision('Reconnecting to live events', this.revision);
@@ -62,8 +79,29 @@ export class WorkbookController {
     }
   }
 
+  private queueHistoryAction(direction: HistoryDirection): void {
+    const available = direction === 'undo' ? this.snapshot?.canUndo : this.snapshot?.canRedo;
+    if (!available) {
+      this.view.showRevision(direction === 'undo' ? 'Nothing to undo' : 'Nothing to redo', this.revision);
+      return;
+    }
+    this.saveQueue = this.saveQueue.then(async () => {
+      this.view.showRevision(direction === 'undo' ? 'Undoing change' : 'Redoing change', this.revision);
+      try {
+        const response = await this.client.restoreHistory(this.revision, direction);
+        this.revision = response.workbook.revision;
+        this.snapshot = response.workbook;
+        this.view.setHistoryState(response.workbook.canUndo, response.workbook.canRedo);
+        window.location.reload();
+      } catch (error) {
+        this.view.showError(error, this.revision);
+      }
+    });
+  }
+
   dispose(): void {
     window.clearTimeout(this.presenceTimer);
+    window.clearTimeout(this.viewportTimer);
     this.eventSubscription?.close();
     this.engine?.dispose();
     this.view.dispose();
@@ -86,12 +124,17 @@ export class WorkbookController {
   }
 
   private queueOperation(operation: WorkbookOperation): void {
-    const target = 'range' in operation ? operation.range : operation.cell;
+    const target = operationTarget(operation);
     this.saveQueue = this.saveQueue.then(async () => {
       this.view.showRevision(`Saving ${operation.sheet}!${target}`, this.revision);
       try {
         const response = await this.client.applyOperations(this.revision, [operation]);
         this.revision = response.workbook.revision;
+        this.snapshot = response.workbook;
+        this.view.setHistoryState(response.workbook.canUndo, response.workbook.canRedo);
+        if (operation.type.startsWith('insert_') || operation.type.startsWith('delete_')) {
+          this.loadedRanges.delete(operation.sheet);
+        }
         this.view.showRevision('Saved', this.revision);
       } catch (error) {
         this.view.showError(error, this.revision);
@@ -99,6 +142,60 @@ export class WorkbookController {
       }
     });
     this.saveQueue = this.saveQueue.catch(() => undefined);
+  }
+
+  private queueViewportLoad(viewport: ViewportChange): void {
+    this.pendingViewport = viewport;
+    window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = window.setTimeout(() => {
+      const next = this.pendingViewport;
+      this.pendingViewport = undefined;
+      if (next) {
+        void this.loadViewport(next);
+      }
+    }, 80);
+  }
+
+  private async loadViewport(viewport: ViewportChange): Promise<void> {
+    const snapshot = this.snapshot;
+    const dimensions = snapshot?.sheetDimensions.find((candidate) => candidate.name === viewport.sheet);
+    if (!snapshot || !dimensions) {
+      return;
+    }
+    const rectangle = planViewportRectangle(viewport, dimensions.rows, dimensions.columns);
+    if (!rectangle || this.isRangeLoaded(viewport.sheet, rectangle)) {
+      return;
+    }
+    const ref = toA1Range(rectangle.startRow, rectangle.startColumn, rectangle.endRow, rectangle.endColumn);
+    const key = `${viewport.sheet}!${ref}`;
+    if (this.pendingRangeLoads.has(key)) {
+      return;
+    }
+    this.pendingRangeLoads.add(key);
+    try {
+      const range = await this.client.readRange(viewport.sheet, ref);
+      this.engine?.applyRange(range);
+      this.recordLoadedRange(viewport.sheet, range.ref);
+      this.view.showRevision(`Loaded ${viewport.sheet}!${ref}`, this.revision);
+    } catch (error) {
+      this.view.showError(error, this.revision);
+    } finally {
+      this.pendingRangeLoads.delete(key);
+    }
+  }
+
+  private recordLoadedRange(sheet: string, ref: string): void {
+    const rectangle = rectangleFromA1(ref);
+    const ranges = this.loadedRanges.get(sheet) ?? [];
+    ranges.push(rectangle);
+    this.loadedRanges.set(sheet, ranges);
+  }
+
+  private isRangeLoaded(sheet: string, target: LoadedRectangle): boolean {
+    return (this.loadedRanges.get(sheet) ?? []).some((loaded) =>
+      loaded.startRow <= target.startRow && loaded.endRow >= target.endRow &&
+      loaded.startColumn <= target.startColumn && loaded.endColumn >= target.endColumn,
+    );
   }
 
   private queuePresence(selection: SelectionChange): void {
@@ -119,6 +216,10 @@ export class WorkbookController {
     if (event.actor !== 'ai') {
       return;
     }
+    if (event.type === 'workbook.reload') {
+      window.location.reload();
+      return;
+    }
     const commitsWorkbook = event.type !== 'presence.update' && event.type !== 'cell.typing';
     if (event.revision > this.revision && commitsWorkbook) {
       this.revision = event.revision;
@@ -126,6 +227,46 @@ export class WorkbookController {
     this.engine?.applyRemoteEvent(event);
     this.view.showAIPresence(event, this.revision);
   }
+}
+
+interface LoadedRectangle {
+  startRow: number;
+  startColumn: number;
+  endRow: number;
+  endColumn: number;
+}
+
+function operationTarget(operation: WorkbookOperation): string {
+  if ('range' in operation) {
+    return operation.range;
+  }
+  if ('cell' in operation) {
+    return operation.cell;
+  }
+  return `${operation.index}:${operation.index + operation.count - 1}`;
+}
+
+function rectangleFromA1(ref: string): LoadedRectangle {
+  const [start = 'A1', end = start] = ref.split(':');
+  const first = parseCellAddress(start);
+  const last = parseCellAddress(end);
+  return { startRow: first.row, startColumn: first.column, endRow: last.row, endColumn: last.column };
+}
+
+function planViewportRectangle(viewport: ViewportChange, rows: number, columns: number): LoadedRectangle | undefined {
+  if (rows < 1 || columns < 1) {
+    return undefined;
+  }
+  const tileRows = 200;
+  const tileColumns = 50;
+  const startRow = Math.floor(Math.max(0, viewport.row) / tileRows) * tileRows;
+  const startColumn = Math.floor(Math.max(0, viewport.column) / tileColumns) * tileColumns;
+  return {
+    startRow,
+    startColumn,
+    endRow: Math.min(rows - 1, startRow + tileRows - 1),
+    endColumn: Math.min(columns - 1, startColumn + tileColumns - 1),
+  };
 }
 
 export function planInitialRanges(snapshot: WorkbookSnapshot): {

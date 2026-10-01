@@ -22,6 +22,11 @@ type applyResponse struct {
 	Applied  int               `json:"applied"`
 }
 
+type historyInput struct {
+	BaseRevision uint64 `json:"baseRevision" jsonschema:"Current workbook revision"`
+	Direction    string `json:"direction,omitempty" jsonschema:"History direction: undo or redo"`
+}
+
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	if token := r.URL.Query().Get("token"); token != "" {
 		if token != s.browserToken {
@@ -120,6 +125,28 @@ func (s *Server) applyOperations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, applyResponse{Workbook: snapshot, Applied: len(input.Operations)})
+}
+
+func (s *Server) restoreHistory(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	var input historyInput
+	decoder := json.NewDecoder(io.LimitReader(r.Body, 64<<10))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid request: %w", err))
+		return
+	}
+	direction := r.PathValue("direction")
+	snapshot, err := s.session.RestoreHistory(input.BaseRevision, "human", direction)
+	if err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, workbook.ErrRevisionConflict) {
+			status = http.StatusConflict
+		}
+		writeError(w, status, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, applyResponse{Workbook: snapshot, Applied: 1})
 }
 
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {

@@ -19,12 +19,19 @@
             <span id="revision-status" class="text-[11px] leading-3.5 text-emerald-200">Connecting</span>
           </div>
         </div>
-        <div id="ai-presence" class="hidden max-w-[42vw] shrink-0 items-center gap-2 rounded-full border border-violet-300 bg-violet-50 px-2.5 py-1 text-xs text-violet-950" aria-live="polite">
-          <span class="size-2 shrink-0 rounded-full bg-violet-600 ring-3 ring-violet-200" aria-hidden="true"></span>
-          <span id="ai-presence-text" class="overflow-hidden text-ellipsis whitespace-nowrap">AI is ready</span>
+        <div class="flex shrink-0 items-center gap-2">
+          <div class="flex items-center gap-1" aria-label="Workbook history">
+            <button id="history-undo" class="rounded border border-emerald-600 bg-emerald-700 px-2 py-1 text-xs font-medium text-white enabled:hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40" type="button" disabled>Undo</button>
+            <button id="history-redo" class="rounded border border-emerald-600 bg-emerald-700 px-2 py-1 text-xs font-medium text-white enabled:hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40" type="button" disabled>Redo</button>
+          </div>
+          <div id="ai-presence" class="hidden max-w-[42vw] shrink-0 items-center gap-2 rounded-full border border-violet-300 bg-violet-50 px-2.5 py-1 text-xs text-violet-950" aria-live="polite">
+            <span class="size-2 shrink-0 rounded-full bg-violet-600 ring-3 ring-violet-200" aria-hidden="true"></span>
+            <span id="ai-presence-text" class="overflow-hidden text-ellipsis whitespace-nowrap">AI is ready</span>
+          </div>
         </div>
       </header>
       <main id="spreadsheet" class="min-h-0 min-w-0" aria-label="Workbook editor"></main>
+      <div id="feature-warnings" class="fixed inset-x-4 bottom-4 z-20 hidden max-w-4xl rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-xl" role="status"></div>
       <div id="fatal-error" class="fixed inset-x-4 top-16 z-20 hidden max-w-3xl rounded-lg border border-red-200 bg-red-50 px-4 py-3.5 text-red-900 shadow-xl" role="alert"></div>
     </div>
     <script type="module" src="/src/main.ts"></script>

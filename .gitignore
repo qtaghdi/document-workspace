@@ -1,5 +1,6 @@
 # Frontend dependencies and local caches
 node_modules/
+.pnpm-store/
 web/.vite/
 internal/httpapi/static/assets/
 internal/httpapi/static/app.html

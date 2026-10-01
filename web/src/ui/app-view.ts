@@ -1,4 +1,4 @@
-import type { WorkbookEvent } from '../contracts';
+import type { FeatureWarning, HistoryDirection, WorkbookEvent } from '../contracts';
 
 export class AppView {
   readonly spreadsheet: HTMLElement;
@@ -7,7 +7,11 @@ export class AppView {
   private readonly presence: HTMLElement;
   private readonly presenceText: HTMLElement;
   private readonly errorPanel: HTMLElement;
+  private readonly warningPanel: HTMLElement;
+  private readonly undoButton: HTMLButtonElement;
+  private readonly redoButton: HTMLButtonElement;
   private presenceTimer: number | undefined;
+  private historyListener: ((direction: HistoryDirection) => void) | undefined;
 
   constructor(document: Document) {
     this.workbookName = requiredElement(document, 'workbook-name');
@@ -15,7 +19,30 @@ export class AppView {
     this.presence = requiredElement(document, 'ai-presence');
     this.presenceText = requiredElement(document, 'ai-presence-text');
     this.errorPanel = requiredElement(document, 'fatal-error');
+    this.warningPanel = requiredElement(document, 'feature-warnings');
+    this.undoButton = requiredButton(document, 'history-undo');
+    this.redoButton = requiredButton(document, 'history-redo');
+    this.undoButton.addEventListener('click', this.handleUndo);
+    this.redoButton.addEventListener('click', this.handleRedo);
     this.spreadsheet = requiredElement(document, 'spreadsheet');
+  }
+
+  onHistoryAction(listener: (direction: HistoryDirection) => void): void {
+    this.historyListener = listener;
+  }
+
+  setHistoryState(canUndo: boolean, canRedo: boolean): void {
+    this.undoButton.disabled = !canUndo;
+    this.redoButton.disabled = !canRedo;
+  }
+
+  showWarnings(warnings: FeatureWarning[]): void {
+    if (warnings.length === 0) {
+      this.warningPanel.classList.add('hidden');
+      return;
+    }
+    this.warningPanel.textContent = `Compatibility notice: ${warnings.map((warning) => warning.message).join('; ')}`;
+    this.warningPanel.classList.remove('hidden');
   }
 
   setWorkbookName(name: string): void {
@@ -27,12 +54,18 @@ export class AppView {
   }
 
   showAIPresence(event: WorkbookEvent, revision: number): void {
+    if (event.type === 'workbook.reload') {
+      this.showRevision(`AI ${event.state} applied`, revision);
+      return;
+    }
     window.clearTimeout(this.presenceTimer);
     this.presence.classList.remove('hidden');
     this.presence.classList.add('flex');
     const selection = event.type === 'cell.typing' || event.type === 'cell.commit'
       ? event.cell
-      : event.range;
+      : 'range' in event
+        ? event.range
+        : `${event.index}:${event.index + event.count - 1}`;
     const location = `${event.sheet}!${selection}`;
     if (event.type === 'presence.update') {
       this.presenceText.textContent = `AI selected ${location}`;
@@ -60,13 +93,26 @@ export class AppView {
 
   dispose(): void {
     window.clearTimeout(this.presenceTimer);
+    this.undoButton.removeEventListener('click', this.handleUndo);
+    this.redoButton.removeEventListener('click', this.handleRedo);
   }
+
+  private readonly handleUndo = (): void => this.historyListener?.('undo');
+  private readonly handleRedo = (): void => this.historyListener?.('redo');
 }
 
 function requiredElement(document: Document, id: string): HTMLElement {
   const element = document.getElementById(id);
   if (!element) {
     throw new Error(`Missing required element #${id}`);
+  }
+  return element;
+}
+
+function requiredButton(document: Document, id: string): HTMLButtonElement {
+  const element = document.getElementById(id);
+  if (!(element instanceof HTMLButtonElement)) {
+    throw new Error(`Missing button #${id}`);
   }
   return element;
 }

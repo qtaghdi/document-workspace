@@ -33,6 +33,7 @@ Current tools:
 - `get_workbook`
 - `read_range`
 - `apply_operations`
+- `restore_history`
 - `update_presence`
 
 `open_workbook` advertises the versioned
@@ -107,7 +108,8 @@ persistence out of Go.
 
 The Go service remains authoritative. Browser focus, draft text, presence, and
 animation are ephemeral. The adapter synchronizes confirmed cell edits,
-rectangular paste, basic formatting, merged cells, and committed AI edits. AI
+rectangular paste, basic formatting, merged cells, row and column structural
+edits, undo and redo reloads, and committed AI edits. AI
 selections are rendered with Univer's OSS range highlight API.
 
 Workbook snapshots include sheet dimensions. The browser divides the initial
@@ -115,7 +117,22 @@ used ranges into requests that stay within the server's range-size limit, then
 maps each range at its original row and column offset. Univer receives the full
 sheet dimensions so its grid remains virtualized even when the source contains
 more rows than the first visible viewport. An initial data budget prevents an
-unbounded workbook from forcing a full import into browser memory.
+unbounded workbook from forcing a full import into browser memory. Scroll
+events request aligned 10,000-cell tiles on demand when the viewport moves
+beyond loaded rectangles.
+
+The session keeps up to ten in-memory revision snapshots for server-authoritative
+undo and redo. Individual snapshots larger than 32 MB are not retained. Undo
+and redo restore a complete prior XLSX package, persist it atomically, advance
+the revision, and publish a `workbook.reload` event. Persistent operation-log
+history across process restarts remains future work.
+
+Workbook snapshots report detected charts, images, conditional formatting,
+data validation, external links, and macros. The browser displays a
+compatibility notice for detected features that it cannot fully render or edit.
+List validation and numeric cell conditional formatting have initial OSS Univer
+mappings. Other rule types and workbook objects remain notice-only. This
+distinguishes visual limitations from silent feature loss.
 
 Only Univer open-source packages are allowed. The Go service will provide
 collaboration, presence state, operation ordering, and XLSX persistence. The UI
@@ -130,8 +147,9 @@ contracts.
 The Univer integration registers required plugins explicitly instead of using
 the complete sheets preset. The MCP App build retains English hyphenation data
 and removes unused language dictionaries from Univer's renderer. This keeps the
-self-contained resource below 8 MB without changing the standalone browser
-build or loading runtime code from a CDN.
+self-contained resource near 8.1 MB after adding validation and conditional
+formatting support, without changing the standalone browser build or loading
+runtime code from a CDN.
 
 See [`adr/0001-spreadsheet-engine.md`](adr/0001-spreadsheet-engine.md) for the
 engine comparison and decision.
@@ -159,9 +177,9 @@ Compatibility tests copy committed fixtures from `testdata/compatibility` to a
 temporary directory, inventory unrelated workbook features, apply an edit
 through `workbook.Session`, then reopen and compare the saved package. The first
 fixture is an Excelize-generated baseline covering formulas, styles, merges,
-validation, conditional formatting, drawings, links, names, and comments.
-Producer-specific Excel and LibreOffice fixtures remain required before making
-broader fidelity claims.
+validation, conditional formatting, drawings, links, names, and comments. The
+corpus also includes a workbook exported by LibreOfficeDev 26.8.0.0.alpha0. A
+Microsoft Excel fixture remains required before making broader fidelity claims.
 
 Hosted storage will preserve immutable workbook versions in object storage and
 keep the active revision pointer in a relational database.
@@ -181,6 +199,11 @@ Initial event types:
 - `range.format`
 - `range.merge_cells`
 - `range.unmerge_cells`
+- `sheet.insert_rows`
+- `sheet.delete_rows`
+- `sheet.insert_columns`
+- `sheet.delete_columns`
+- `workbook.reload`
 
 The browser may animate `cell.typing`, but persistence occurs at cell or batch
 granularity. The service retains a bounded in-memory event history and replays
@@ -218,12 +241,11 @@ authorization.
 
 ## Architectural Decisions Pending
 
-- Extended Excelize-to-Univer mappings for validation, conditional formatting,
-  charts, images, and unsupported feature warnings.
+- Editable browser mappings for validation, conditional formatting, charts,
+  and images. Detection and compatibility notices are implemented.
 - Further production JavaScript startup reductions beyond the current plugin
   mode and locale pruning.
 - Formula calculation strategy.
-- Unsupported XLSX feature detection strategy.
 - Operation log persistence format.
 - Durable event replay retention policy.
 - OAuth provider and hosted tenancy model.

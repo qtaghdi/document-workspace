@@ -3,6 +3,7 @@ package workbook
 import (
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/xuri/excelize/v2"
@@ -289,5 +290,153 @@ func TestStylesAndMergesRoundTrip(t *testing.T) {
 	updatedStyle := updated.Rows[0][0].Style
 	if updatedStyle == nil || updatedStyle.Bold || updatedStyle.FillColor != "#00FF00" {
 		t.Fatalf("updated style = %#v", updatedStyle)
+	}
+}
+
+func TestStructuralOperationsPersistAndPublish(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "book.xlsx")
+	file := excelize.NewFile()
+	if err := file.SetCellValue("Sheet1", "A2", "row"); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.SetCellValue("Sheet1", "B1", "column"); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+	_ = file.Close()
+
+	session, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	updated, err := session.Apply(1, "ai", []Operation{
+		{Type: "insert_rows", Sheet: "Sheet1", Index: 2, Count: 2},
+		{Type: "insert_columns", Sheet: "Sheet1", Index: 2, Count: 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Revision != 2 {
+		t.Fatalf("revision = %d, want 2", updated.Revision)
+	}
+	row, err := session.ReadRange("Sheet1", "A4:A4")
+	if err != nil || row.Rows[0][0].Value != "row" {
+		t.Fatalf("shifted row = %#v, error = %v", row, err)
+	}
+	column, err := session.ReadRange("Sheet1", "C1:C1")
+	if err != nil || column.Rows[0][0].Value != "column" {
+		t.Fatalf("shifted column = %#v, error = %v", column, err)
+	}
+
+	updated, err = session.Apply(2, "human", []Operation{
+		{Type: "delete_rows", Sheet: "Sheet1", Index: 2, Count: 2},
+		{Type: "delete_columns", Sheet: "Sheet1", Index: 2, Count: 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.SheetDimensions[0].Rows != 2 || updated.SheetDimensions[0].Columns != 2 {
+		t.Fatalf("restored dimensions = %#v", updated.SheetDimensions[0])
+	}
+	row, err = session.ReadRange("Sheet1", "A2:A2")
+	if err != nil || row.Rows[0][0].Value != "row" {
+		t.Fatalf("restored row = %#v, error = %v", row, err)
+	}
+
+	events, _ := session.EventsAfter(0)
+	var structureEvents int
+	for _, event := range events {
+		if strings.HasPrefix(event.Type, "sheet.") {
+			structureEvents++
+			if event.Index < 1 || event.Count < 1 {
+				t.Fatalf("invalid structural event = %#v", event)
+			}
+		}
+	}
+	if structureEvents != 4 {
+		t.Fatalf("structural events = %d, want 4", structureEvents)
+	}
+}
+
+func TestFeatureWarningsDetectBrowserCompatibilityGaps(t *testing.T) {
+	path := filepath.Join("..", "..", "testdata", "compatibility", "feature-rich.xlsx")
+	session, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	warnings := session.Snapshot().Warnings
+	wanted := map[string]bool{
+		"charts": false, "images": false, "conditional formatting": false, "data validation": false,
+	}
+	for _, warning := range warnings {
+		if _, ok := wanted[warning.Feature]; ok {
+			wanted[warning.Feature] = true
+		}
+	}
+	for feature, found := range wanted {
+		if !found {
+			t.Fatalf("missing %s warning in %#v", feature, warnings)
+		}
+	}
+	rangeData, err := session.ReadRange("Compatibility", "C2:D10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rangeData.Validations) == 0 || rangeData.Validations[0].Type != "list" {
+		t.Fatalf("validations = %#v", rangeData.Validations)
+	}
+	if len(rangeData.ConditionalFormatting) == 0 || rangeData.ConditionalFormatting[0].Style == nil {
+		t.Fatalf("conditional formatting = %#v", rangeData.ConditionalFormatting)
+	}
+}
+
+func TestUndoAndRedoRestoreCommittedWorkbookRevisions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "book.xlsx")
+	file := excelize.NewFile()
+	if err := file.SetCellValue("Sheet1", "A1", "before"); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+	_ = file.Close()
+
+	session, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	changed, err := session.Apply(1, "human", []Operation{{Type: "set_cell", Sheet: "Sheet1", Cell: "A1", Value: "after"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed.CanUndo || changed.CanRedo {
+		t.Fatalf("history state after edit = %#v", changed)
+	}
+	undone, err := session.RestoreHistory(2, "human", "undo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if undone.Revision != 3 || undone.CanUndo || !undone.CanRedo {
+		t.Fatalf("history state after undo = %#v", undone)
+	}
+	value, err := session.ReadRange("Sheet1", "A1")
+	if err != nil || value.Rows[0][0].Value != "before" {
+		t.Fatalf("undo value = %#v, error = %v", value, err)
+	}
+	redone, err := session.RestoreHistory(3, "human", "redo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if redone.Revision != 4 || !redone.CanUndo || redone.CanRedo {
+		t.Fatalf("history state after redo = %#v", redone)
+	}
+	value, err = session.ReadRange("Sheet1", "A1")
+	if err != nil || value.Rows[0][0].Value != "after" {
+		t.Fatalf("redo value = %#v, error = %v", value, err)
 	}
 }
