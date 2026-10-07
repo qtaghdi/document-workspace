@@ -137,12 +137,17 @@ snapshots.
 Workbook snapshots report detected charts, images, conditional formatting,
 data validation, external links, and macros. The browser displays a
 compatibility notice for detected features that it cannot fully render or edit.
-List validation and numeric cell conditional formatting have initial OSS Univer
-mappings. PNG, JPEG, and GIF images use Univer's OSS drawing packages. Supported
-chart types are extracted as bounded series data and rendered as read-only SVG
-previews because Univer's native chart package is not open source. Object edits
-are not written back yet. Unsupported or oversized objects are omitted with a
-visible notice. This distinguishes visual limitations from silent feature loss.
+Inline and range-backed lists, literal whole-number, decimal, and date rules,
+and custom-formula validation have OSS Univer mappings. Common numeric, text,
+formula, rank, average, date-period, color-scale, and data-bar conditional
+formatting rules are also mapped. Formula-backed numeric bounds, named-range
+lists, time and text-length validation, icon sets, and some advanced rule
+options remain XLSX-preserved but are not rendered. PNG, JPEG, and GIF images
+use Univer's OSS drawing packages. Supported chart types are extracted as
+bounded series data and rendered as read-only SVG previews because Univer's
+native chart package is not open source. Object edits are not written back yet.
+Unsupported or oversized objects are omitted with a visible notice. This
+distinguishes visual limitations from silent feature loss.
 
 Only Univer open-source packages are allowed. The Go service will provide
 collaboration, presence state, operation ordering, and XLSX persistence. The UI
@@ -254,8 +259,8 @@ authorization.
 
 ## Architectural Decisions Pending
 
-- Broader validation and conditional formatting mappings, editable image and
-  chart write-back, and additional chart type previews.
+- Remaining advanced validation and conditional formatting mappings, editable
+  image and chart write-back, and additional chart type previews.
 - Further production JavaScript startup reductions beyond the current plugin
   mode and locale pruning.
 - Formula calculation strategy.

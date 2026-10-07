@@ -382,15 +382,47 @@ func TestFeatureWarningsDetectBrowserCompatibilityGaps(t *testing.T) {
 			t.Fatalf("missing %s warning in %#v", feature, warnings)
 		}
 	}
-	rangeData, err := session.ReadRange("Compatibility", "C2:D10")
+	rangeData, err := session.ReadRange("Compatibility", "C2:M10")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rangeData.Validations) == 0 || rangeData.Validations[0].Type != "list" {
+	validations := make(map[string]DataValidation, len(rangeData.Validations))
+	for _, validation := range rangeData.Validations {
+		validations[validation.Range] = validation
+	}
+	if validations["D2:D10"].Type != "list" || validations["D2:D10"].Formula1 != `"A,B,C"` {
 		t.Fatalf("validations = %#v", rangeData.Validations)
 	}
-	if len(rangeData.ConditionalFormatting) == 0 || rangeData.ConditionalFormatting[0].Style == nil {
+	if whole := validations["G2:G10"]; whole.Type != "whole" || whole.Operator != "between" || whole.Formula1 != "1" || whole.Formula2 != "100" || !whole.ShowErrorMessage || !whole.ShowInputMessage {
+		t.Fatalf("whole validation = %#v", whole)
+	}
+	if list := validations["H2:H10"]; list.Type != "list" || list.Formula1 != "$N$2:$N$4" {
+		t.Fatalf("range list validation = %#v", list)
+	}
+	if custom := validations["I2:I10"]; custom.Type != "custom" || custom.Formula1 != "LEN(I2)<=12" {
+		t.Fatalf("custom validation = %#v", custom)
+	}
+	if date := validations["M2:M10"]; date.Type != "date" || date.Formula1 != "45292" || date.Formula2 != "45657" {
+		t.Fatalf("date validation = %#v", date)
+	}
+	formats := make(map[string]ConditionalFormat, len(rangeData.ConditionalFormatting))
+	for _, format := range rangeData.ConditionalFormatting {
+		formats[format.Range] = format
+	}
+	if formats["C2:C4"].Style == nil || formats["C2:C4"].Type != "cell" {
 		t.Fatalf("conditional formatting = %#v", rangeData.ConditionalFormatting)
+	}
+	if text := formats["I2:I4"]; text.Type != "text" || text.Criteria != "containing" || text.Value != "Alpha" || text.Style == nil {
+		t.Fatalf("text conditional formatting = %#v", text)
+	}
+	if scale := formats["J2:J4"]; scale.Type != "3_color_scale" || scale.MidType != "percentile" || scale.MinColor == "" || scale.MaxColor == "" {
+		t.Fatalf("color scale formatting = %#v", scale)
+	}
+	if bar := formats["K2:K4"]; bar.Type != "data_bar" || bar.BarColor == "" {
+		t.Fatalf("data bar formatting = %#v", bar)
+	}
+	if duplicate := formats["L2:L4"]; duplicate.Type != "duplicate" || duplicate.Style == nil {
+		t.Fatalf("duplicate formatting = %#v", duplicate)
 	}
 	objects, err := session.ReadSheetObjects("Compatibility")
 	if err != nil {

@@ -205,14 +205,16 @@ func compatibilityConditionalFormatting(t *testing.T, file *excelize.File) []str
 
 func compatibilityPictures(t *testing.T, file *excelize.File) []string {
 	t.Helper()
-	pictures, err := file.GetPictures("Compatibility", "H2")
-	if err != nil {
-		t.Fatal(err)
-	}
-	result := make([]string, 0, len(pictures))
-	for _, picture := range pictures {
-		hash := sha256.Sum256(picture.File)
-		result = append(result, picture.Extension+";"+hex.EncodeToString(hash[:]))
+	result := make([]string, 0, 1)
+	for _, cell := range []string{"H2", "P2"} {
+		pictures, err := file.GetPictures("Compatibility", cell)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, picture := range pictures {
+			hash := sha256.Sum256(picture.File)
+			result = append(result, picture.Extension+";"+hex.EncodeToString(hash[:]))
+		}
 	}
 	sort.Strings(result)
 	return result

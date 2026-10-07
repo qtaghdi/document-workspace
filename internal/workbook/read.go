@@ -72,11 +72,23 @@ func (s *Session) validationsInRange(sheet string, c1, r1, c2, r2 int) ([]DataVa
 	if err != nil {
 		return nil, fmt.Errorf("read data validations for %s: %w", sheet, err)
 	}
+	date1904 := false
+	if properties, propertiesErr := s.file.GetWorkbookProps(); propertiesErr == nil && properties.Date1904 != nil {
+		date1904 = *properties.Date1904
+	}
 	result := make([]DataValidation, 0)
 	for _, item := range items {
 		for _, ref := range strings.Fields(item.Sqref) {
 			if rangeIntersects(ref, c1, r1, c2, r2) {
-				result = append(result, DataValidation{Range: ref, Type: item.Type, Operator: item.Operator, Formula1: item.Formula1, Formula2: item.Formula2, AllowBlank: item.AllowBlank, ShowDropDown: item.ShowDropDown})
+				result = append(result, DataValidation{
+					Range: ref, Type: item.Type, Operator: item.Operator,
+					Formula1: item.Formula1, Formula2: item.Formula2,
+					AllowBlank: item.AllowBlank, ShowDropDown: item.ShowDropDown,
+					ShowErrorMessage: item.ShowErrorMessage, Error: optionalString(item.Error),
+					ErrorTitle: optionalString(item.ErrorTitle), ShowInputMessage: item.ShowInputMessage,
+					Prompt: optionalString(item.Prompt), PromptTitle: optionalString(item.PromptTitle),
+					Date1904: date1904,
+				})
 			}
 		}
 	}
@@ -94,7 +106,14 @@ func (s *Session) conditionalFormattingInRange(sheet string, c1, r1, c2, r2 int)
 			continue
 		}
 		for _, option := range options {
-			item := ConditionalFormat{Range: ref, Type: option.Type, Criteria: option.Criteria, Value: option.Value}
+			item := ConditionalFormat{
+				Range: ref, Type: option.Type, Criteria: option.Criteria, Value: option.Value,
+				MinType: option.MinType, MidType: option.MidType, MaxType: option.MaxType,
+				MinValue: option.MinValue, MidValue: option.MidValue, MaxValue: option.MaxValue,
+				MinColor: option.MinColor, MidColor: option.MidColor, MaxColor: option.MaxColor,
+				BarColor: option.BarColor, BarOnly: option.BarOnly, BarSolid: option.BarSolid,
+				AboveAverage: option.AboveAverage, Percent: option.Percent,
+			}
 			if option.Format != nil {
 				style, styleErr := s.file.GetConditionalStyle(*option.Format)
 				if styleErr != nil {
@@ -106,6 +125,13 @@ func (s *Session) conditionalFormattingInRange(sheet string, c1, r1, c2, r2 int)
 		}
 	}
 	return result, nil
+}
+
+func optionalString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func rangeIntersects(ref string, c1, r1, c2, r2 int) bool {

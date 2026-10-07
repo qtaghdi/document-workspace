@@ -83,6 +83,13 @@ and this project intends to follow Semantic Versioning when releases begin.
   previews.
 - Added OSS Univer image rendering and custom read-only previews for bar, line,
   area, pie, and doughnut charts without adding Univer Pro dependencies.
+- Added OSS Univer mappings for range-backed lists, literal whole-number,
+  decimal, and date validation, custom-formula validation, prompts, and errors.
+- Added OSS Univer rendering for common text, formula, rank, average,
+  date-period, color-scale, data-bar, unique-value, and duplicate-value
+  conditional formatting rules.
+- Expanded the generated XLSX compatibility fixture and adapter assertions for
+  validation metadata and conditional formatting parameters.
 
 ### Changed
 

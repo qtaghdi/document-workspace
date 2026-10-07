@@ -49,10 +49,21 @@ export const workbookRangeSchema = z.object({
     range: z.string(), type: z.string(), operator: z.string().optional(),
     formula1: z.string().optional(), formula2: z.string().optional(),
     allowBlank: z.boolean().optional(), showDropDown: z.boolean().optional(),
+    showErrorMessage: z.boolean().optional(), error: z.string().optional(),
+    errorTitle: z.string().optional(), showInputMessage: z.boolean().optional(),
+    prompt: z.string().optional(), promptTitle: z.string().optional(),
+    date1904: z.boolean().optional(),
   })).optional(),
   conditionalFormatting: z.array(z.object({
     range: z.string(), type: z.string(), criteria: z.string().optional(),
-    value: z.string().optional(), style: cellStyleSchema.optional(),
+    value: z.string().optional(), minType: z.string().optional(),
+    midType: z.string().optional(), maxType: z.string().optional(),
+    minValue: z.string().optional(), midValue: z.string().optional(),
+    maxValue: z.string().optional(), minColor: z.string().optional(),
+    midColor: z.string().optional(), maxColor: z.string().optional(),
+    barColor: z.string().optional(), barOnly: z.boolean().optional(),
+    barSolid: z.boolean().optional(), aboveAverage: z.boolean().optional(),
+    percent: z.boolean().optional(), style: cellStyleSchema.optional(),
   })).optional(),
 });
 

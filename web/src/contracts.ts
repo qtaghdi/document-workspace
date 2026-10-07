@@ -56,6 +56,13 @@ export interface DataValidation {
   formula2?: string;
   allowBlank?: boolean;
   showDropDown?: boolean;
+  showErrorMessage?: boolean;
+  error?: string;
+  errorTitle?: string;
+  showInputMessage?: boolean;
+  prompt?: string;
+  promptTitle?: string;
+  date1904?: boolean;
 }
 
 export interface ConditionalFormat {
@@ -63,6 +70,20 @@ export interface ConditionalFormat {
   type: string;
   criteria?: string;
   value?: string;
+  minType?: string;
+  midType?: string;
+  maxType?: string;
+  minValue?: string;
+  midValue?: string;
+  maxValue?: string;
+  minColor?: string;
+  midColor?: string;
+  maxColor?: string;
+  barColor?: string;
+  barOnly?: boolean;
+  barSolid?: boolean;
+  aboveAverage?: boolean;
+  percent?: boolean;
   style?: CellStyle;
 }
 

@@ -132,9 +132,10 @@ are implemented. Live host UI certification remains.
 
 1. Add a provenance-recorded Microsoft Excel fixture to the XLSX compatibility
    corpus. LibreOffice coverage is complete.
-2. Extend the initial list validation and numeric conditional formatting
-   mappings, then add editable image and chart write-back. Image rendering and
-   read-only chart previews are complete.
+2. Add editable image and chart write-back. Common validation and conditional
+   formatting mappings, image rendering, and read-only chart previews are
+   complete; named-range lists, formula-backed bounds, icon sets, and other
+   advanced workbook rules remain future compatibility work.
 3. Certify the loopback browser fallback and browser-originated edits in the
    current Claude Desktop browser panel. Native embedded MCP App rendering
    remains pending in both hosts.

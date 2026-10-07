@@ -33,21 +33,42 @@ type Range struct {
 }
 
 type DataValidation struct {
-	Range        string `json:"range"`
-	Type         string `json:"type"`
-	Operator     string `json:"operator,omitempty"`
-	Formula1     string `json:"formula1,omitempty"`
-	Formula2     string `json:"formula2,omitempty"`
-	AllowBlank   bool   `json:"allowBlank,omitempty"`
-	ShowDropDown bool   `json:"showDropDown,omitempty"`
+	Range            string `json:"range"`
+	Type             string `json:"type"`
+	Operator         string `json:"operator,omitempty"`
+	Formula1         string `json:"formula1,omitempty"`
+	Formula2         string `json:"formula2,omitempty"`
+	AllowBlank       bool   `json:"allowBlank,omitempty"`
+	ShowDropDown     bool   `json:"showDropDown,omitempty"`
+	ShowErrorMessage bool   `json:"showErrorMessage,omitempty"`
+	Error            string `json:"error,omitempty"`
+	ErrorTitle       string `json:"errorTitle,omitempty"`
+	ShowInputMessage bool   `json:"showInputMessage,omitempty"`
+	Prompt           string `json:"prompt,omitempty"`
+	PromptTitle      string `json:"promptTitle,omitempty"`
+	Date1904         bool   `json:"date1904,omitempty"`
 }
 
 type ConditionalFormat struct {
-	Range    string     `json:"range"`
-	Type     string     `json:"type"`
-	Criteria string     `json:"criteria,omitempty"`
-	Value    string     `json:"value,omitempty"`
-	Style    *CellStyle `json:"style,omitempty"`
+	Range        string     `json:"range"`
+	Type         string     `json:"type"`
+	Criteria     string     `json:"criteria,omitempty"`
+	Value        string     `json:"value,omitempty"`
+	MinType      string     `json:"minType,omitempty"`
+	MidType      string     `json:"midType,omitempty"`
+	MaxType      string     `json:"maxType,omitempty"`
+	MinValue     string     `json:"minValue,omitempty"`
+	MidValue     string     `json:"midValue,omitempty"`
+	MaxValue     string     `json:"maxValue,omitempty"`
+	MinColor     string     `json:"minColor,omitempty"`
+	MidColor     string     `json:"midColor,omitempty"`
+	MaxColor     string     `json:"maxColor,omitempty"`
+	BarColor     string     `json:"barColor,omitempty"`
+	BarOnly      bool       `json:"barOnly,omitempty"`
+	BarSolid     bool       `json:"barSolid,omitempty"`
+	AboveAverage bool       `json:"aboveAverage,omitempty"`
+	Percent      bool       `json:"percent,omitempty"`
+	Style        *CellStyle `json:"style,omitempty"`
 }
 
 type SheetObjects struct {

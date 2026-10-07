@@ -20,10 +20,10 @@ func main() {
 	must(workbook.SetSheetName("Sheet1", sheet))
 
 	rows := [][]any{
-		{"Category", "Amount", "Score", "Choice"},
-		{"Alpha", 1250.5, 10, "A"},
-		{"Beta", 845.25, 20, "B"},
-		{"Gamma", 420.75, 30, "C"},
+		{"Category", "Amount", "Score", "Choice", "", "", "Whole", "Range choice", "Text", "Scale", "Bar", "Duplicate", "Date", "Allowed values"},
+		{"Alpha", 1250.5, 10, "A", "", "", 25, "North", "Alpha item", 10, 15, "Repeat", 45292, "North"},
+		{"Beta", 845.25, 20, "B", "", "", 50, "South", "Beta item", 50, 45, "Unique", 45474, "South"},
+		{"Gamma", 420.75, 30, "C", "", "", 75, "West", "Alpha note", 90, 85, "Repeat", 45657, "West"},
 	}
 	for index, row := range rows {
 		cell, err := excelize.CoordinatesToCellName(1, index+1)
@@ -49,6 +49,30 @@ func main() {
 	must(validation.SetDropList([]string{"A", "B", "C"}))
 	must(workbook.AddDataValidation(sheet, validation))
 
+	wholeValidation := excelize.NewDataValidation(true)
+	wholeValidation.Sqref = "G2:G10"
+	must(wholeValidation.SetRange(1, 100, excelize.DataValidationTypeWhole, excelize.DataValidationOperatorBetween))
+	wholeValidation.SetInput("Whole number", "Enter a whole number from 1 through 100.")
+	wholeValidation.SetError(excelize.DataValidationErrorStyleStop, "Invalid number", "The value must be a whole number from 1 through 100.")
+	must(workbook.AddDataValidation(sheet, wholeValidation))
+
+	rangeListValidation := excelize.NewDataValidation(true)
+	rangeListValidation.Sqref = "H2:H10"
+	rangeListValidation.SetSqrefDropList("$N$2:$N$4")
+	must(workbook.AddDataValidation(sheet, rangeListValidation))
+
+	customValidation := excelize.NewDataValidation(true)
+	customValidation.Sqref = "I2:I10"
+	customValidation.Type = "custom"
+	customValidation.Formula1 = "LEN(I2)&lt;=12"
+	customValidation.SetError(excelize.DataValidationErrorStyleWarning, "Long text", "Use no more than 12 characters.")
+	must(workbook.AddDataValidation(sheet, customValidation))
+
+	dateValidation := excelize.NewDataValidation(true)
+	dateValidation.Sqref = "M2:M10"
+	must(dateValidation.SetRange(45292, 45657, excelize.DataValidationTypeDate, excelize.DataValidationOperatorBetween))
+	must(workbook.AddDataValidation(sheet, dateValidation))
+
 	conditionalStyle, err := workbook.NewConditionalStyle(&excelize.Style{
 		Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"FFC6EFCE"}},
 	})
@@ -59,8 +83,36 @@ func main() {
 		Format:   &conditionalStyle,
 		Value:    "15",
 	}}))
+	must(workbook.SetConditionalFormat(sheet, "I2:I4", []excelize.ConditionalFormatOptions{{
+		Type:     "text",
+		Criteria: "containing",
+		Value:    "Alpha",
+		Format:   &conditionalStyle,
+	}}))
+	must(workbook.SetConditionalFormat(sheet, "J2:J4", []excelize.ConditionalFormatOptions{{
+		Type:     "3_color_scale",
+		Criteria: "=",
+		MinType:  "min",
+		MidType:  "percentile",
+		MaxType:  "max",
+		MinColor: "#F8696B",
+		MidColor: "#FFEB84",
+		MaxColor: "#63BE7B",
+	}}))
+	must(workbook.SetConditionalFormat(sheet, "K2:K4", []excelize.ConditionalFormatOptions{{
+		Type:     "data_bar",
+		Criteria: "=",
+		MinType:  "min",
+		MaxType:  "max",
+		BarColor: "#638EC6",
+	}}))
+	must(workbook.SetConditionalFormat(sheet, "L2:L4", []excelize.ConditionalFormatOptions{{
+		Type:     "duplicate",
+		Criteria: "=",
+		Format:   &conditionalStyle,
+	}}))
 
-	must(workbook.AddChart(sheet, "H8", &excelize.Chart{
+	must(workbook.AddChart(sheet, "P8", &excelize.Chart{
 		Type: excelize.Col,
 		Series: []excelize.ChartSeries{{
 			Name:       sheet + "!$B$1",
@@ -69,7 +121,7 @@ func main() {
 		}},
 		Title: excelize.ChartTitle{Paragraph: []excelize.RichTextRun{{Text: "Amounts"}}},
 	}))
-	must(workbook.AddPictureFromBytes(sheet, "H2", &excelize.Picture{
+	must(workbook.AddPictureFromBytes(sheet, "P2", &excelize.Picture{
 		Extension: ".png",
 		File:      compatibilityImage(),
 		Format:    &excelize.GraphicOptions{AltText: "Compatibility marker"},

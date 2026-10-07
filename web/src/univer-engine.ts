@@ -1,4 +1,5 @@
 import { LocaleType, mergeLocales } from '@univerjs/core';
+import type { IRange } from '@univerjs/core';
 import { UniverDocsPlugin } from '@univerjs/docs';
 import { UniverDocsDrawingPlugin } from '@univerjs/docs-drawing';
 import { UniverDocsUIPlugin } from '@univerjs/docs-ui';
@@ -19,7 +20,11 @@ import { UniverSheetsDrawingUIPlugin } from '@univerjs/sheets-drawing-ui';
 import SheetsDrawingUIEnUS from '@univerjs/sheets-drawing-ui/locale/en-US';
 import { UniverSheetsDataValidationPlugin } from '@univerjs/sheets-data-validation';
 import { UniverSheetsDataValidationUIPlugin } from '@univerjs/sheets-data-validation-ui';
+import type { FDataValidationBuilder } from '@univerjs/sheets-data-validation/facade';
 import { UniverSheetsConditionalFormattingPlugin } from '@univerjs/sheets-conditional-formatting';
+import { CFNumberOperator, CFTimePeriodOperator, CFValueType } from '@univerjs/sheets-conditional-formatting';
+import type { IConditionFormattingRule, IValueConfig } from '@univerjs/sheets-conditional-formatting';
+import type { FConditionalFormattingBuilder } from '@univerjs/sheets-conditional-formatting/facade';
 import { UniverUIPlugin } from '@univerjs/ui';
 import UniverPresetSheetsCoreEnUS from '@univerjs/preset-sheets-core/locales/en-US';
 
@@ -49,6 +54,8 @@ import type {
   HistoryDirection,
   SheetObjects,
   SheetChart,
+  DataValidation,
+  ConditionalFormat,
 } from './contracts';
 import { parseCellAddress, toA1Range } from './spreadsheet/a1';
 import { formatAfterCommand } from './spreadsheet/univer/command-mapper';
@@ -321,33 +328,80 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
     const worksheet = this.univerAPI.getActiveWorkbook()?.getSheetByName(source.sheet);
     if (!worksheet) return;
     for (const validation of source.validations ?? []) {
-      const key = `${source.sheet}!${validation.range}!${validation.type}!${validation.formula1 ?? ''}`;
-      if (this.appliedValidations.has(key) || validation.type !== 'list') continue;
-      const values = parseValidationList(validation.formula1 ?? '');
-      if (values.length === 0) continue;
-      const rule = this.univerAPI.newDataValidation()
-        .requireValueInList(values, false, validation.showDropDown !== false)
-        .setAllowBlank(validation.allowBlank ?? false)
-        .build();
-      worksheet.getRange(validation.range).setDataValidation(rule);
+      const key = validationKey(source.sheet, validation);
+      if (this.appliedValidations.has(key)) continue;
+      const target = worksheet.getRange(validation.range);
+      const options = validationOptions(validation);
+      const builder = this.univerAPI.newDataValidation();
+      let configured = false;
+
+      if (validation.type === 'list') {
+        const rangeSource = parseValidationRange(validation.formula1 ?? '', source.sheet);
+        if (rangeSource) {
+          const sourceWorksheet = this.univerAPI.getActiveWorkbook()?.getSheetByName(rangeSource.sheet);
+          if (sourceWorksheet) {
+            builder.requireValueInRange(
+              sourceWorksheet.getRange(rangeSource.range),
+              false,
+              !validation.showDropDown,
+            );
+            configured = true;
+          }
+        } else {
+          const values = parseValidationList(validation.formula1 ?? '');
+          if (values.length > 0) {
+            builder.requireValueInList(values, false, !validation.showDropDown);
+            configured = true;
+          }
+        }
+      } else if (validation.type === 'whole' || validation.type === 'decimal') {
+        configured = configureNumberValidation(builder, validation, validation.type === 'whole');
+      } else if (validation.type === 'date') {
+        configured = configureDateValidation(builder, validation);
+      } else if (validation.type === 'custom' && validation.formula1) {
+        builder.requireFormulaSatisfied(normalizeFormula(validation.formula1));
+        configured = true;
+      }
+
+      if (!configured) continue;
+      target.setDataValidation(builder.setOptions(options).build());
       this.appliedValidations.add(key);
     }
     for (const format of source.conditionalFormatting ?? []) {
-      const key = `${source.sheet}!${format.range}!${format.type}!${format.criteria ?? ''}!${format.value ?? ''}`;
-      if (this.appliedConditionalFormats.has(key) || format.type !== 'cell') continue;
-      const value = Number(format.value);
-      if (!Number.isFinite(value)) continue;
+      const key = conditionalFormatKey(source.sheet, format);
+      if (this.appliedConditionalFormats.has(key)) continue;
       const base = worksheet.newConditionalFormattingRule();
-      let builder;
-      if (format.criteria === '>') builder = base.whenNumberGreaterThan(value);
-      else if (format.criteria === '>=') builder = base.whenNumberGreaterThanOrEqualTo(value);
-      else if (format.criteria === '<') builder = base.whenNumberLessThan(value);
-      else if (format.criteria === '<=') builder = base.whenNumberLessThanOrEqualTo(value);
-      else if (format.criteria === '=') builder = base.whenNumberEqualTo(value);
-      else if (format.criteria === '!=') builder = base.whenNumberNotEqualTo(value);
-      else continue;
-      if (format.style?.fillColor) builder.setBackground(format.style.fillColor);
-      builder.setRanges([worksheet.getRange(format.range).getRange()]);
+      const targetRange = worksheet.getRange(format.range).getRange();
+
+      if (format.type === '2_color_scale' || format.type === '3_color_scale') {
+        const config = colorScaleConfig(format);
+        if (!config) continue;
+        const rule = base.setColorScale(config).setRanges([targetRange]).build();
+        worksheet.addConditionalFormattingRule(rule);
+        this.appliedConditionalFormats.add(key);
+        continue;
+      }
+      if (format.type === 'data_bar') {
+        const min = conditionalValue(format.minType, format.minValue);
+        const max = conditionalValue(format.maxType, format.maxValue);
+        if (!min || !max || !format.barColor) continue;
+        const rule = base.setDataBar({
+          min,
+          max,
+          isGradient: !format.barSolid,
+          positiveColor: format.barColor,
+          nativeColor: '#dc2626',
+          isShowValue: !format.barOnly,
+        }).setRanges([targetRange]).build();
+        worksheet.addConditionalFormattingRule(rule);
+        this.appliedConditionalFormats.add(key);
+        continue;
+      }
+
+      const builder = highlightRuleBuilder(base, format);
+      if (!builder) continue;
+      applyConditionalStyle(builder, format);
+      builder.setRanges([targetRange]);
       worksheet.addConditionalFormattingRule(builder.build());
       this.appliedConditionalFormats.add(key);
     }
@@ -537,6 +591,242 @@ function parseValidationList(formula: string): string[] {
     ? formula.slice(1, -1).replaceAll('""', '"')
     : formula;
   return normalized.split(',').map((value) => value.trim()).filter(Boolean);
+}
+
+function validationKey(sheet: string, validation: DataValidation): string {
+  return [sheet, validation.range, validation.type, validation.operator ?? '', validation.formula1 ?? '', validation.formula2 ?? ''].join('!');
+}
+
+function validationOptions(validation: DataValidation) {
+  return {
+    allowBlank: validation.allowBlank ?? false,
+    showErrorMessage: validation.showErrorMessage ?? false,
+    error: validation.error,
+    errorTitle: validation.errorTitle,
+    showInputMessage: validation.showInputMessage ?? false,
+    prompt: validation.prompt,
+    promptTitle: validation.promptTitle,
+  };
+}
+
+function parseValidationRange(formula: string, currentSheet: string): { sheet: string; range: string } | undefined {
+  const normalized = formula.trim().replace(/^=/, '').replace(/\$/g, '');
+  if (!normalized || normalized.startsWith('"') || normalized.includes('[')) return undefined;
+  const separator = normalized.lastIndexOf('!');
+  const rawSheet = separator >= 0 ? normalized.slice(0, separator) : currentSheet;
+  const range = separator >= 0 ? normalized.slice(separator + 1) : normalized;
+  if (!/^[A-Z]{1,3}[1-9]\d*(?::[A-Z]{1,3}[1-9]\d*)?$/i.test(range)) return undefined;
+  const sheet = rawSheet.startsWith("'") && rawSheet.endsWith("'")
+    ? rawSheet.slice(1, -1).replace(/''/g, "'")
+    : rawSheet;
+  return { sheet, range };
+}
+
+function configureNumberValidation(builder: FDataValidationBuilder, validation: DataValidation, integer: boolean): boolean {
+  const first = finiteNumber(validation.formula1);
+  const second = finiteNumber(validation.formula2);
+  switch (validation.operator) {
+    case 'between':
+      if (first === undefined || second === undefined) return false;
+      builder.requireNumberBetween(first, second, integer);
+      return true;
+    case 'notBetween':
+      if (first === undefined || second === undefined) return false;
+      builder.requireNumberNotBetween(first, second, integer);
+      return true;
+    case 'equal':
+      if (first === undefined) return false;
+      builder.requireNumberEqualTo(first, integer);
+      return true;
+    case 'notEqual':
+      if (first === undefined) return false;
+      builder.requireNumberNotEqualTo(first, integer);
+      return true;
+    case 'greaterThan':
+      if (first === undefined) return false;
+      builder.requireNumberGreaterThan(first, integer);
+      return true;
+    case 'greaterThanOrEqual':
+      if (first === undefined) return false;
+      builder.requireNumberGreaterThanOrEqualTo(first, integer);
+      return true;
+    case 'lessThan':
+      if (first === undefined) return false;
+      builder.requireNumberLessThan(first, integer);
+      return true;
+    case 'lessThanOrEqual':
+      if (first === undefined) return false;
+      builder.requireNumberLessThanOrEqualTo(first, integer);
+      return true;
+    default:
+      return false;
+  }
+}
+
+function configureDateValidation(builder: FDataValidationBuilder, validation: DataValidation): boolean {
+  const first = excelSerialDate(validation.formula1, validation.date1904 ?? false);
+  const second = excelSerialDate(validation.formula2, validation.date1904 ?? false);
+  switch (validation.operator) {
+    case 'between':
+      if (!first || !second) return false;
+      builder.requireDateBetween(first, second);
+      return true;
+    case 'notBetween':
+      if (!first || !second) return false;
+      builder.requireDateNotBetween(first, second);
+      return true;
+    case 'equal':
+      if (!first) return false;
+      builder.requireDateEqualTo(first);
+      return true;
+    case 'greaterThan':
+      if (!first) return false;
+      builder.requireDateAfter(first);
+      return true;
+    case 'greaterThanOrEqual':
+      if (!first) return false;
+      builder.requireDateOnOrAfter(first);
+      return true;
+    case 'lessThan':
+      if (!first) return false;
+      builder.requireDateBefore(first);
+      return true;
+    case 'lessThanOrEqual':
+      if (!first) return false;
+      builder.requireDateOnOrBefore(first);
+      return true;
+    default:
+      return false;
+  }
+}
+
+function excelSerialDate(value: string | undefined, date1904: boolean): Date | undefined {
+  const serial = finiteNumber(value);
+  if (serial === undefined) return undefined;
+  const epoch = date1904 ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30);
+  const date = new Date(epoch + serial * 86_400_000);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function finiteNumber(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+interface ConditionalHighlightBuilder {
+  setBackground(color?: string): ConditionalHighlightBuilder;
+  setBold(value: boolean): ConditionalHighlightBuilder;
+  setFontColor(color?: string): ConditionalHighlightBuilder;
+  setItalic(value: boolean): ConditionalHighlightBuilder;
+  setRanges(ranges: IRange[]): ConditionalHighlightBuilder;
+  build(): IConditionFormattingRule;
+}
+
+function conditionalFormatKey(sheet: string, format: ConditionalFormat): string {
+  return [sheet, format.range, format.type, format.criteria ?? '', format.value ?? '', format.minValue ?? '', format.midValue ?? '', format.maxValue ?? ''].join('!');
+}
+
+function highlightRuleBuilder(base: FConditionalFormattingBuilder, format: ConditionalFormat): ConditionalHighlightBuilder | undefined {
+  const value = finiteNumber(format.value);
+  const min = finiteNumber(format.minValue);
+  const max = finiteNumber(format.maxValue);
+  if (format.type === 'cell') {
+    if (format.criteria === 'between' && min !== undefined && max !== undefined) return base.whenNumberBetween(min, max);
+    if (format.criteria === 'not between' && min !== undefined && max !== undefined) return base.whenNumberNotBetween(min, max);
+    if (value === undefined) return undefined;
+    if (format.criteria === '>' || format.criteria === 'greater than') return base.whenNumberGreaterThan(value);
+    if (format.criteria === '>=' || format.criteria === 'greater than or equal to') return base.whenNumberGreaterThanOrEqualTo(value);
+    if (format.criteria === '<' || format.criteria === 'less than') return base.whenNumberLessThan(value);
+    if (format.criteria === '<=' || format.criteria === 'less than or equal to') return base.whenNumberLessThanOrEqualTo(value);
+    if (format.criteria === '=' || format.criteria === '==' || format.criteria === 'equal to') return base.whenNumberEqualTo(value);
+    if (format.criteria === '!=' || format.criteria === 'not equal to') return base.whenNumberNotEqualTo(value);
+    return undefined;
+  }
+  if (format.type === 'text' && format.value !== undefined) {
+    if (format.criteria === 'containing') return base.whenTextContains(format.value);
+    if (format.criteria === 'not containing') return base.whenTextDoesNotContain(format.value);
+    if (format.criteria === 'begins with') return base.whenTextStartsWith(format.value);
+    if (format.criteria === 'ends with') return base.whenTextEndsWith(format.value);
+    if (format.criteria === 'equal to') return base.whenTextEqualTo(format.value);
+    return undefined;
+  }
+  if (format.type === 'blanks') return base.whenCellEmpty();
+  if (format.type === 'no_blanks') return base.whenCellNotEmpty();
+  if (format.type === 'unique') return base.setUniqueValues();
+  if (format.type === 'duplicate') return base.setDuplicateValues();
+  if ((format.type === 'top' || format.type === 'bottom') && value !== undefined && value > 0) {
+    return base.setRank({ isBottom: format.type === 'bottom', isPercent: format.percent ?? false, value });
+  }
+  if (format.type === 'average') {
+    return base.setAverage(format.aboveAverage ? CFNumberOperator.greaterThan : CFNumberOperator.lessThan);
+  }
+  if (format.type === 'formula' && format.criteria) return base.whenFormulaSatisfied(normalizeFormula(format.criteria));
+  if (format.type === 'time_period') {
+    const period = timePeriodOperator(format.criteria);
+    return period ? base.whenDate(period) : undefined;
+  }
+  return undefined;
+}
+
+function applyConditionalStyle(builder: ConditionalHighlightBuilder, format: ConditionalFormat): void {
+  if (format.style?.fillColor) builder.setBackground(format.style.fillColor);
+  if (format.style?.fontColor) builder.setFontColor(format.style.fontColor);
+  if (format.style?.bold) builder.setBold(true);
+  if (format.style?.italic) builder.setItalic(true);
+}
+
+function timePeriodOperator(criteria: string | undefined): CFTimePeriodOperator | undefined {
+  switch (criteria) {
+    case 'today': return CFTimePeriodOperator.today;
+    case 'yesterday': return CFTimePeriodOperator.yesterday;
+    case 'tomorrow': return CFTimePeriodOperator.tomorrow;
+    case 'last 7 days': return CFTimePeriodOperator.last7Days;
+    case 'this month': return CFTimePeriodOperator.thisMonth;
+    case 'last month': return CFTimePeriodOperator.lastMonth;
+    case 'continue month': return CFTimePeriodOperator.nextMonth;
+    case 'this week': return CFTimePeriodOperator.thisWeek;
+    case 'last week': return CFTimePeriodOperator.lastWeek;
+    case 'continue week': return CFTimePeriodOperator.nextWeek;
+    default: return undefined;
+  }
+}
+
+function conditionalValue(type: string | undefined, value: string | undefined): IValueConfig | undefined {
+  switch (type) {
+    case 'min': return { type: CFValueType.min };
+    case 'max': return { type: CFValueType.max };
+    case 'num': {
+      const parsed = finiteNumber(value);
+      return parsed === undefined ? undefined : { type: CFValueType.num, value: parsed };
+    }
+    case 'percent': {
+      const parsed = finiteNumber(value);
+      return parsed === undefined ? undefined : { type: CFValueType.percent, value: parsed };
+    }
+    case 'percentile': {
+      const parsed = finiteNumber(value);
+      return parsed === undefined ? undefined : { type: CFValueType.percentile, value: parsed };
+    }
+    case 'formula': return value ? { type: CFValueType.formula, value: normalizeFormula(value) } : undefined;
+    default: return undefined;
+  }
+}
+
+function colorScaleConfig(format: ConditionalFormat): Array<{ index: number; color: string; value: IValueConfig }> | undefined {
+  const min = conditionalValue(format.minType, format.minValue);
+  const max = conditionalValue(format.maxType, format.maxValue);
+  if (!min || !max || !format.minColor || !format.maxColor) return undefined;
+  if (format.type === '2_color_scale') {
+    return [{ index: 0, color: format.minColor, value: min }, { index: 1, color: format.maxColor, value: max }];
+  }
+  const mid = conditionalValue(format.midType, format.midValue);
+  if (!mid || !format.midColor) return undefined;
+  return [
+    { index: 0, color: format.minColor, value: min },
+    { index: 1, color: format.midColor, value: mid },
+    { index: 2, color: format.maxColor, value: max },
+  ];
 }
 
 const chartColors = ['#2563eb', '#059669', '#dc2626', '#7c3aed', '#d97706', '#0891b2'];
