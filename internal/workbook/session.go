@@ -123,7 +123,17 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 		if isStructuralOperation(op.Type) {
 			selection = structuralSelection(op)
 		}
+		if isObjectOperation(op.Type) && op.TargetCell != "" {
+			selection = op.TargetCell
+		}
 		s.publishLocked(Event{Revision: nextRevision, Actor: actor, Type: "presence.update", Sheet: op.Sheet, Range: selection, State: "editing"})
+		if isObjectOperation(op.Type) {
+			if err := s.applyObjectOperationLocked(op); err != nil {
+				s.reloadLocked()
+				return Snapshot{}, err
+			}
+			continue
+		}
 		if isStructuralOperation(op.Type) {
 			if err := s.applyStructuralOperationLocked(op); err != nil {
 				s.reloadLocked()
@@ -209,6 +219,10 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 		s.growDimensionsLocked(operations)
 	}
 	for _, op := range operations {
+		if isObjectOperation(op.Type) {
+			s.publishLocked(Event{Revision: s.revision, Actor: actor, Type: "workbook.reload", Sheet: op.Sheet, State: "objects"})
+			continue
+		}
 		if isStructuralOperation(op.Type) {
 			s.publishLocked(Event{Revision: s.revision, Actor: actor, Type: "sheet." + op.Type, Sheet: op.Sheet, Index: op.Index, Count: op.Count})
 			continue

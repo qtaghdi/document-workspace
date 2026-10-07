@@ -32,7 +32,8 @@ The Go service exposes:
 - row and column insertion and deletion;
 - bounded server-authoritative undo and redo that survive service restarts;
 - viewport-triggered range loading for large worksheets;
-- OSS image rendering and read-only chart previews;
+- OSS image and chart preview placement, resize, and deletion with XLSX
+  write-back;
 - compatibility notices for preserved features that are not fully editable;
 - revision checks and atomic XLSX saves.
 

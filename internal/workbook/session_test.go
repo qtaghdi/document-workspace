@@ -2,6 +2,7 @@ package workbook
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -436,6 +437,95 @@ func TestFeatureWarningsDetectBrowserCompatibilityGaps(t *testing.T) {
 	}
 	if got := objects.Charts[0].Series[0].Values; len(got) != 3 || got[0] != 1250.5 || got[2] != 420.75 {
 		t.Fatalf("chart values = %#v", got)
+	}
+}
+
+func TestImageAndChartOperationsPersistAndReopen(t *testing.T) {
+	source := compatibilityFixturePath(t, "feature-rich.xlsx")
+	target := filepath.Join(t.TempDir(), "objects.xlsx")
+	content, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	session, err := Open(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	objects, err := session.ReadSheetObjects("Compatibility")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(objects.Images) != 1 || len(objects.Charts) != 1 {
+		t.Fatalf("objects = %#v", objects)
+	}
+	image := objects.Images[0]
+	chart := objects.Charts[0]
+	title := "Updated amounts"
+	updated, err := session.Apply(session.Snapshot().Revision, "human", []Operation{
+		{
+			Type: "set_image", Sheet: "Compatibility", ObjectID: image.ID,
+			Cell: "P2", TargetCell: "Q3", OffsetX: 3, OffsetY: 4, Width: 32, Height: 24,
+		},
+		{
+			Type: "set_chart", Sheet: "Compatibility", ObjectID: chart.ID,
+			Cell: "P8", TargetCell: "Q10", OffsetX: 5, OffsetY: 6, Width: 360, Height: 220, Title: &title,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Revision != 2 {
+		t.Fatalf("revision = %d, want 2", updated.Revision)
+	}
+	if err := session.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	reopened, err := Open(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	objects, err = reopened.ReadSheetObjects("Compatibility")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(objects.Images) != 1 {
+		t.Fatalf("images after reopen = %#v", objects.Images)
+	}
+	if got := objects.Images[0]; got.Row != 2 || got.Column != 16 || got.OffsetX != 3 || got.OffsetY != 4 || got.Width != 32 || got.Height != 24 || got.Data != image.Data {
+		t.Fatalf("updated image = %#v", got)
+	}
+	if len(objects.Charts) != 1 {
+		t.Fatalf("charts after reopen = %#v", objects.Charts)
+	}
+	if got := objects.Charts[0]; got.Title != title || got.Row != 9 || got.Column != 16 || got.OffsetX != 5 || got.OffsetY != 6 || got.Width < 350 || got.Height < 210 {
+		t.Fatalf("updated chart = %#v", got)
+	}
+	if _, err := reopened.Apply(reopened.Snapshot().Revision, "human", []Operation{
+		{Type: "delete_image", Sheet: "Compatibility", ObjectID: objects.Images[0].ID, Cell: "Q3"},
+		{Type: "delete_chart", Sheet: "Compatibility", ObjectID: objects.Charts[0].ID, Cell: "Q10"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reopened.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	deleted, err := Open(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleted.Close()
+	objects, err = deleted.ReadSheetObjects("Compatibility")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(objects.Images) != 0 || len(objects.Charts) != 0 {
+		t.Fatalf("objects after delete = %#v", objects)
 	}
 }
 

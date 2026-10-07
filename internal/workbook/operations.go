@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Session) validateOperation(op Operation) error {
-	if op.Type != "set_cell" && op.Type != "set_formula" && op.Type != "paste_range" && op.Type != "set_format" && op.Type != "merge_cells" && op.Type != "unmerge_cells" && !isStructuralOperation(op.Type) {
+	if op.Type != "set_cell" && op.Type != "set_formula" && op.Type != "paste_range" && op.Type != "set_format" && op.Type != "merge_cells" && op.Type != "unmerge_cells" && !isStructuralOperation(op.Type) && !isObjectOperation(op.Type) {
 		return fmt.Errorf("unsupported type %q", op.Type)
 	}
 	if !s.hasSheet(op.Sheet) {
@@ -30,6 +30,9 @@ func (s *Session) validateOperation(op Operation) error {
 			return fmt.Errorf("structural operation exceeds worksheet limit %d", limit)
 		}
 		return nil
+	}
+	if isObjectOperation(op.Type) {
+		return s.validateObjectOperationLocked(op)
 	}
 	if op.Type == "paste_range" {
 		_, _, width, height, err := parseRange(op.Range)
@@ -70,6 +73,15 @@ func (s *Session) validateOperation(op Operation) error {
 		return errors.New("formula is required")
 	}
 	return nil
+}
+
+func isObjectOperation(operationType string) bool {
+	switch operationType {
+	case "set_image", "delete_image", "set_chart", "delete_chart":
+		return true
+	default:
+		return false
+	}
 }
 
 func isStructuralOperation(operationType string) bool {

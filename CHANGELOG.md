@@ -90,6 +90,13 @@ and this project intends to follow Semantic Versioning when releases begin.
   conditional formatting rules.
 - Expanded the generated XLSX compatibility fixture and adapter assertions for
   validation metadata and conditional formatting parameters.
+- Added revisioned image and chart operations for placement, resize, and
+  deletion through the shared browser, HTTP, and MCP contracts.
+- Added existing chart title updates for AI operations while preserving chart
+  type, source references, series data, and unrelated workbook features.
+- Added direct Univer drawing synchronization so human image and chart preview
+  transforms persist to XLSX and remote object edits trigger an authoritative
+  reload.
 
 ### Changed
 
@@ -112,8 +119,8 @@ and this project intends to follow Semantic Versioning when releases begin.
   unions that encode required fields for each command and event type.
 - Documented host-owned manual, automatic, one-time, and persistent approval
   behavior for workbook MCP tools.
-- Updated compatibility notices to distinguish rendered but non-editable images
-  and charts from partially supported workbook rules.
+- Updated compatibility notices to describe supported image and chart
+  write-back controls and the remaining advanced chart editing limits.
 
 ### Fixed
 

@@ -143,7 +143,7 @@ export class WorkbookController {
         this.revision = response.workbook.revision;
         this.snapshot = response.workbook;
         this.view.setHistoryState(response.workbook.canUndo, response.workbook.canRedo);
-        if (operation.type.startsWith('insert_') || operation.type.startsWith('delete_')) {
+        if (operation.type === 'insert_rows' || operation.type === 'delete_rows' || operation.type === 'insert_columns' || operation.type === 'delete_columns') {
           this.loadedRanges.delete(operation.sheet);
         }
         this.view.showRevision('Saved', this.revision);

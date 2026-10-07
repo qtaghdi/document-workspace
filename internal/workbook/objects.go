@@ -286,6 +286,10 @@ func (s *Session) readSheetChartsLocked(sheet string) ([]SheetChart, error) {
 		if anchor.From.Row < 0 || anchor.From.Column < 0 {
 			continue
 		}
+		width, height, sizeErr := s.drawingPixelSizeLocked(sheet, anchor.From, anchor.To)
+		if sizeErr != nil {
+			return nil, sizeErr
+		}
 		item := SheetChart{
 			ID:      fmt.Sprintf("chart-%d", index+1),
 			Title:   truncateText(chartTitle(chartXML), maxChartTitleBytes),
@@ -294,8 +298,8 @@ func (s *Session) readSheetChartsLocked(sheet string) ([]SheetChart, error) {
 			Column:  anchor.From.Column,
 			OffsetX: anchor.From.ColumnOffset / 9525,
 			OffsetY: anchor.From.RowOffset / 9525,
-			Width:   min(maxSheetObjectDimension, max(240, (anchor.To.Column-anchor.From.Column)*64+(anchor.To.ColumnOffset-anchor.From.ColumnOffset)/9525)),
-			Height:  min(maxSheetObjectDimension, max(160, (anchor.To.Row-anchor.From.Row)*20+(anchor.To.RowOffset-anchor.From.RowOffset)/9525)),
+			Width:   min(maxSheetObjectDimension, max(1, width)),
+			Height:  min(maxSheetObjectDimension, max(1, height)),
 		}
 		for _, series := range block.Series[:min(len(block.Series), maxChartSeries)] {
 			name := series.Text.Value

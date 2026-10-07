@@ -104,10 +104,10 @@ status and presence presentation. Pure A1, command, and workbook mapping code
 is separate from the stateful Univer lifecycle adapter.
 
 All editor-specific behavior is isolated behind `SpreadsheetEngine`. The
-adapter receives workbook snapshots, emits confirmed human cell edits, and
-applies committed remote events. This boundary preserves the option to replace
-Univer with ONLYOFFICE or a custom engine without moving validation and
-persistence out of Go.
+adapter receives workbook snapshots, emits confirmed human cell and sheet
+object edits, and applies committed remote events. This boundary preserves the
+option to replace Univer with ONLYOFFICE or a custom engine without moving
+validation and persistence out of Go.
 
 The Go service remains authoritative. Browser focus, draft text, presence, and
 animation are ephemeral. The adapter synchronizes confirmed cell edits,
@@ -144,8 +144,11 @@ formatting rules are also mapped. Formula-backed numeric bounds, named-range
 lists, time and text-length validation, icon sets, and some advanced rule
 options remain XLSX-preserved but are not rendered. PNG, JPEG, and GIF images
 use Univer's OSS drawing packages. Supported chart types are extracted as
-bounded series data and rendered as read-only SVG previews because Univer's
-native chart package is not open source. Object edits are not written back yet.
+bounded series data and rendered as SVG previews because Univer's native chart
+package is not open source. Images and chart previews can be moved, resized, or
+deleted through the common operation contract. Existing chart titles can also
+be changed by an AI operation. Chart type, series, axis, legend, and style
+editing remain XLSX-preserved but are not exposed as direct object controls.
 Unsupported or oversized objects are omitted with a visible notice. This
 distinguishes visual limitations from silent feature loss.
 
@@ -223,6 +226,11 @@ Initial event types:
 - `sheet.delete_columns`
 - `workbook.reload`
 
+Image and chart operations publish `workbook.reload` with the `objects` state
+for remote clients. The local editor already contains the completed drawing
+transform, while another client reloads authoritative object data from the
+saved XLSX package.
+
 The browser may animate `cell.typing`, but persistence occurs at cell or batch
 granularity. The service retains a bounded in-memory event history and replays
 events after the browser's `Last-Event-ID` on reconnect.
@@ -259,8 +267,8 @@ authorization.
 
 ## Architectural Decisions Pending
 
-- Remaining advanced validation and conditional formatting mappings, editable
-  image and chart write-back, and additional chart type previews.
+- Remaining advanced validation and conditional formatting mappings, chart
+  type and series editing, image insertion, and additional chart previews.
 - Further production JavaScript startup reductions beyond the current plugin
   mode and locale pruning.
 - Formula calculation strategy.

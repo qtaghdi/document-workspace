@@ -113,7 +113,8 @@ formula does not imply that the service can calculate the same result as Excel.
 ## Operations and Events
 
 Operations are validated commands such as `set_cell`, `set_formula`,
-`set_format`, `paste_range`, `insert_rows`, and `delete_rows`.
+`set_format`, `paste_range`, `insert_rows`, `delete_rows`, `set_image`, and
+`set_chart`.
 
 Every accepted write must:
 

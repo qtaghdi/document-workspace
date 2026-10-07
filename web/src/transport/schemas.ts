@@ -109,7 +109,7 @@ export const workbookEventSchema = z.discriminatedUnion('type', [
   z.object({
     ...eventBase,
     type: z.literal('workbook.reload'),
-    state: z.enum(['undo', 'redo']),
+    state: z.enum(['undo', 'redo', 'objects']),
   }),
   z.object({
     ...eventBase,

@@ -58,8 +58,8 @@ func inspectFeatureWarnings(path string) ([]FeatureWarning, error) {
 
 	features := []string{"charts", "images", "conditional formatting", "data validation", "external links", "macros"}
 	messages := map[string]string{
-		"charts":                 "charts are shown as read-only previews and refresh when the workbook reopens",
-		"images":                 "images are shown in the browser, but image edits are not written back yet",
+		"charts":                 "chart previews can be moved, resized, or deleted, and AI operations can update existing chart titles",
+		"images":                 "images can be moved, resized, or deleted in the browser and are written back to the workbook",
 		"conditional formatting": "conditional formatting is preserved, with common cell, text, rank, color scale, and data bar rules rendered in the browser",
 		"data validation":        "data validation is preserved, with inline and range lists, literal number and date rules, and custom formulas active in the browser",
 		"external links":         "external links are preserved but are not opened or evaluated by the browser",

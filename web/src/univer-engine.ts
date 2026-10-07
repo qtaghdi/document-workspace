@@ -10,6 +10,7 @@ import { UniverFormulaEnginePlugin } from '@univerjs/engine-formula';
 import { UniverRenderEnginePlugin } from '@univerjs/engine-render';
 import { createUniver } from '@univerjs/presets';
 import { UniverSheetsPlugin } from '@univerjs/sheets';
+import type { FWorksheet } from '@univerjs/sheets/facade';
 import { UniverSheetsFormulaPlugin } from '@univerjs/sheets-formula';
 import { UniverSheetsFormulaUIPlugin } from '@univerjs/sheets-formula-ui';
 import { UniverSheetsNumfmtPlugin } from '@univerjs/sheets-numfmt';
@@ -54,6 +55,7 @@ import type {
   HistoryDirection,
   SheetObjects,
   SheetChart,
+  SheetImage,
   DataValidation,
   ConditionalFormat,
 } from './contracts';
@@ -82,6 +84,7 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
   private applyingRemote = false;
   private readonly appliedValidations = new Set<string>();
   private readonly appliedConditionalFormats = new Set<string>();
+  private readonly objectBindings = new Map<string, SheetObjectBinding>();
 
   constructor(container: HTMLElement) {
     const { univer, univerAPI } = createUniver({
@@ -175,8 +178,14 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
           return;
         }
         const worksheet = this.univerAPI.getActiveWorkbook()?.getActiveSheet();
+        if (!worksheet) {
+          return;
+        }
+        if (this.handleSheetObjectCommand(id, params, worksheet)) {
+          return;
+        }
         const range = worksheet?.getActiveRange();
-        if (!worksheet || !range) {
+        if (!range) {
           return;
         }
         const commandRange = commandParameterRange(params) ?? {
@@ -202,6 +211,9 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
           return;
         }
         if (id === 'sheet.command.add-worksheet-merge') {
+          if (range.getWidth() === 1 && range.getHeight() === 1) {
+            return;
+          }
           this.operationListener({ type: 'merge_cells', sheet: worksheet.getSheetName(), range: range.getA1Notation() });
           return;
         }
@@ -425,6 +437,8 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
             .setWidth(source.width)
             .setHeight(source.height)
             .buildAsync();
+          image.drawingId = sheetObjectDrawingID(group.sheet, 'image', source.id);
+          this.objectBindings.set(image.drawingId, { kind: 'image', source });
           worksheet.insertImages([image]);
         }
         for (const chart of group.charts ?? []) {
@@ -437,12 +451,74 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
             .setWidth(chart.width)
             .setHeight(chart.height)
             .buildAsync();
+          image.drawingId = sheetObjectDrawingID(group.sheet, 'chart', chart.id);
+          this.objectBindings.set(image.drawingId, { kind: 'chart', source: chart });
           worksheet.insertImages([image]);
         }
       }
     } finally {
       this.applyingRemote = false;
     }
+  }
+
+  private handleSheetObjectCommand(
+    commandID: string,
+    params: unknown,
+    worksheet: FWorksheet,
+  ): boolean {
+    if (commandID !== 'sheet.command.set-sheet-image' && commandID !== 'sheet.command.set-drawing-placement' && commandID !== 'sheet.command.remove-sheet-image') {
+      return false;
+    }
+    const drawingIDs = commandDrawingIDs(params);
+    if (drawingIDs.length === 0) return false;
+    for (const drawingID of drawingIDs) {
+      const binding = this.objectBindings.get(drawingID);
+      if (!binding) continue;
+      const cell = toA1Range(binding.source.row, binding.source.column, binding.source.row, binding.source.column);
+      if (commandID === 'sheet.command.remove-sheet-image') {
+        this.operationListener?.({
+          type: binding.kind === 'image' ? 'delete_image' : 'delete_chart',
+          sheet: worksheet.getSheetName(),
+          objectId: binding.source.id,
+          cell,
+        });
+        this.objectBindings.delete(drawingID);
+        continue;
+      }
+      const layout = worksheet.getDrawingLayout().drawings.find((drawing) => drawing.drawingId === drawingID);
+      if (!layout) continue;
+      const placement = worksheet.resolveDrawingPlacement({
+        kind: this.univerAPI.Enum.SheetDrawingAnchorType.Position,
+        bounds: layout.bounds,
+      });
+      if (placement.kind !== this.univerAPI.Enum.SheetDrawingAnchorType.Position) continue;
+      const nextSource = {
+        ...binding.source,
+        row: placement.from.row,
+        column: placement.from.column,
+        offsetX: Math.max(0, Math.round(placement.from.columnOffset)),
+        offsetY: Math.max(0, Math.round(placement.from.rowOffset)),
+        width: Math.max(1, Math.round(layout.bounds.width)),
+        height: Math.max(1, Math.round(layout.bounds.height)),
+      };
+      this.operationListener?.({
+        type: binding.kind === 'image' ? 'set_image' : 'set_chart',
+        sheet: worksheet.getSheetName(),
+        objectId: binding.source.id,
+        cell,
+        targetCell: toA1Range(nextSource.row, nextSource.column, nextSource.row, nextSource.column),
+        offsetX: nextSource.offsetX,
+        offsetY: nextSource.offsetY,
+        width: nextSource.width,
+        height: nextSource.height,
+      });
+      if (binding.kind === 'image') {
+        this.objectBindings.set(drawingID, { kind: 'image', source: nextSource as SheetImage });
+      } else {
+        this.objectBindings.set(drawingID, { kind: 'chart', source: nextSource as SheetChart });
+      }
+    }
+    return true;
   }
 
   applyRemoteEvent(event: WorkbookEvent): void {
@@ -564,6 +640,26 @@ export class UniverSpreadsheetEngine implements SpreadsheetEngine {
     this.univer.dispose();
   }
 
+}
+
+type SheetObjectBinding =
+  | { kind: 'image'; source: SheetImage }
+  | { kind: 'chart'; source: SheetChart };
+
+function sheetObjectDrawingID(sheet: string, kind: SheetObjectBinding['kind'], objectID: string): string {
+  return `xlsx-viewer:${encodeURIComponent(sheet)}:${kind}:${objectID}`;
+}
+
+function commandDrawingIDs(params: unknown): string[] {
+  if (!params || typeof params !== 'object' || !('drawings' in params) || !Array.isArray(params.drawings)) {
+    return [];
+  }
+  return params.drawings.flatMap((drawing) => {
+    if (!drawing || typeof drawing !== 'object' || !('drawingId' in drawing) || typeof drawing.drawingId !== 'string') {
+      return [];
+    }
+    return [drawing.drawingId];
+  });
 }
 
 function commandParameterRange(params: unknown): { startRow: number; endRow: number; startColumn: number; endColumn: number } | undefined {

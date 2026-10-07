@@ -48,8 +48,9 @@ worksheet data now loads in bounded chunks using server-reported sheet
 dimensions, then loads aligned tiles as the user scrolls. Row and column
 operations, durable bounded server-authoritative undo and redo, unsupported
 feature notices, and a LibreOffice-produced compatibility fixture are
-implemented. OSS image rendering and read-only chart previews are implemented.
-Editable workbook object write-back and a Microsoft Excel fixture remain.
+implemented. Images and chart previews can be moved, resized, and deleted with
+XLSX write-back, and AI operations can update existing chart titles. Image
+insertion, full chart definition editing, and a Microsoft Excel fixture remain.
 
 - Integrate Univer behind a replaceable `SpreadsheetEngine` boundary.
 - Bundle the TypeScript application with Vite and style the application shell
@@ -132,10 +133,11 @@ are implemented. Live host UI certification remains.
 
 1. Add a provenance-recorded Microsoft Excel fixture to the XLSX compatibility
    corpus. LibreOffice coverage is complete.
-2. Add editable image and chart write-back. Common validation and conditional
-   formatting mappings, image rendering, and read-only chart previews are
-   complete; named-range lists, formula-backed bounds, icon sets, and other
-   advanced workbook rules remain future compatibility work.
+2. Add image insertion and chart type, series, axis, legend, and style editing.
+   Existing images and chart previews already support placement, resize, and
+   deletion write-back, and existing chart titles can be changed by AI tools.
+   Named-range lists, formula-backed bounds, icon sets, and other advanced
+   workbook rules remain future compatibility work.
 3. Certify the loopback browser fallback and browser-originated edits in the
    current Claude Desktop browser panel. Native embedded MCP App rendering
    remains pending in both hosts.

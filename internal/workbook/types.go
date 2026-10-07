@@ -112,16 +112,23 @@ type ChartSeries struct {
 }
 
 type Operation struct {
-	Type    string        `json:"type" jsonschema:"Operation type: set_cell, set_formula, paste_range, set_format, merge_cells, unmerge_cells, insert_rows, delete_rows, insert_columns, or delete_columns"`
-	Sheet   string        `json:"sheet" jsonschema:"Worksheet name"`
-	Cell    string        `json:"cell,omitempty" jsonschema:"A1-style cell address for a single-cell operation"`
-	Range   string        `json:"range,omitempty" jsonschema:"A1-style destination range for paste_range"`
-	Value   any           `json:"value,omitempty" jsonschema:"Cell value for set_cell"`
-	Formula string        `json:"formula,omitempty" jsonschema:"Formula for set_formula, with or without a leading equals sign"`
-	Cells   [][]CellInput `json:"cells,omitempty" jsonschema:"Rectangular cell matrix for paste_range"`
-	Format  *CellFormat   `json:"format,omitempty" jsonschema:"Partial formatting for set_format"`
-	Index   int           `json:"index,omitempty" jsonschema:"One-based row or column index for a structural operation"`
-	Count   int           `json:"count,omitempty" jsonschema:"Number of rows or columns for a structural operation"`
+	Type       string        `json:"type" jsonschema:"Operation type: set_cell, set_formula, paste_range, set_format, merge_cells, unmerge_cells, insert_rows, delete_rows, insert_columns, delete_columns, set_image, delete_image, set_chart, or delete_chart"`
+	Sheet      string        `json:"sheet" jsonschema:"Worksheet name"`
+	Cell       string        `json:"cell,omitempty" jsonschema:"A1-style cell address for a single-cell operation"`
+	Range      string        `json:"range,omitempty" jsonschema:"A1-style destination range for paste_range"`
+	Value      any           `json:"value,omitempty" jsonschema:"Cell value for set_cell"`
+	Formula    string        `json:"formula,omitempty" jsonschema:"Formula for set_formula, with or without a leading equals sign"`
+	Cells      [][]CellInput `json:"cells,omitempty" jsonschema:"Rectangular cell matrix for paste_range"`
+	Format     *CellFormat   `json:"format,omitempty" jsonschema:"Partial formatting for set_format"`
+	Index      int           `json:"index,omitempty" jsonschema:"One-based row or column index for a structural operation"`
+	Count      int           `json:"count,omitempty" jsonschema:"Number of rows or columns for a structural operation"`
+	ObjectID   string        `json:"objectId,omitempty" jsonschema:"Sheet object identifier returned by get_sheet_objects"`
+	TargetCell string        `json:"targetCell,omitempty" jsonschema:"A1-style destination anchor for an image or chart"`
+	OffsetX    int           `json:"offsetX,omitempty" jsonschema:"Horizontal object offset in pixels"`
+	OffsetY    int           `json:"offsetY,omitempty" jsonschema:"Vertical object offset in pixels"`
+	Width      int           `json:"width,omitempty" jsonschema:"Object width in pixels"`
+	Height     int           `json:"height,omitempty" jsonschema:"Object height in pixels"`
+	Title      *string       `json:"title,omitempty" jsonschema:"Replacement chart title, including an empty title"`
 }
 
 type CellFormat struct {

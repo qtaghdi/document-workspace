@@ -152,7 +152,20 @@ export type WorkbookOperation =
   | (RangeOperation & { type: 'paste_range'; cells: CellInput[][] })
   | (RangeOperation & { type: 'set_format'; format: CellFormat })
   | (RangeOperation & { type: 'merge_cells' | 'unmerge_cells' })
-  | { type: 'insert_rows' | 'delete_rows' | 'insert_columns' | 'delete_columns'; sheet: string; index: number; count: number };
+  | { type: 'insert_rows' | 'delete_rows' | 'insert_columns' | 'delete_columns'; sheet: string; index: number; count: number }
+  | {
+      type: 'set_image' | 'set_chart';
+      sheet: string;
+      objectId: string;
+      cell: string;
+      targetCell: string;
+      offsetX: number;
+      offsetY: number;
+      width: number;
+      height: number;
+      title?: string;
+    }
+  | { type: 'delete_image' | 'delete_chart'; sheet: string; objectId: string; cell: string };
 
 interface EventBase {
   sequence: number;
@@ -163,7 +176,7 @@ interface EventBase {
 export type WorkbookEvent =
   | (EventBase & {
       type: 'workbook.reload';
-      state: 'undo' | 'redo';
+      state: 'undo' | 'redo' | 'objects';
     })
   | (EventBase & {
       type: 'presence.update';
