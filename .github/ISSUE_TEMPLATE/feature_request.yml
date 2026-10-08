@@ -19,10 +19,41 @@ body:
     validations:
       required: true
   - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable conditions that must be true before this issue can close.
+      placeholder: |
+        - [ ] The user can...
+        - [ ] Automated tests prove...
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Identify the behavior, boundaries, and files or systems expected to change.
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: Identify related work that this issue must not absorb.
+    validations:
+      required: true
+  - type: textarea
     id: proposal
     attributes:
       label: Proposed approach
       description: Optional implementation or architecture notes.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Verification and evidence
+      description: Describe automated checks, manual checks, fixtures, or host evidence required.
+    validations:
+      required: true
   - type: dropdown
     id: area
     attributes:

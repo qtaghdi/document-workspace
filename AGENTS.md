@@ -249,6 +249,16 @@ and expected outputs.
 ## Git and Change Management
 
 - Preserve the initial Python MVP until its behavior is covered by Go tests.
+- Every repository change, including documentation, maintenance, and CI work,
+  must start from a GitHub issue and reach `main` through a linked pull request.
+  Do not commit or push changes directly to `main`.
+- Search open issues before creating one. Reuse an issue only when its problem,
+  scope, and acceptance criteria cover the requested work.
+- Record the problem, desired outcome, acceptance criteria, scope, exclusions,
+  risks, and required evidence in the issue before implementation.
+- Branch from current `main` using
+  `<type>/<issue-number>-<short-description>`, such as
+  `feat/42-ai-presence` or `fix/57-revision-conflict`.
 - Use Conventional Commits with an English imperative subject:
   `<type>(<scope>): <summary>`.
 - Allowed commit types are `feat`, `fix`, `docs`, `refactor`, `test`, `build`,
@@ -256,12 +266,15 @@ and expected outputs.
 - Prefer scopes such as `go`, `web`, `mcp`, `xlsx`, `realtime`, `docs`,
   `build`, and `deps`. Omit the scope only when a change truly spans the whole
   repository.
-- Use lowercase branch names in the form `<type>/<short-description>`, such as
-  `feat/ai-presence` or `fix/revision-conflict`.
 - Keep commit subjects at 72 characters or fewer and do not end them with a
   period.
-- Use the repository issue and pull request templates. Pull request titles must
-  follow the same Conventional Commits format.
+- Use the repository issue and pull request templates. A pull request must use
+  a Conventional Commits title and include `Closes #<issue-number>` in its
+  linked-issue section.
+- Keep the issue and pull request current when scope, risks, verification, or
+  follow-up work changes. Create another issue for unrelated work.
+- Do not merge a pull request unless the repository owner explicitly requests
+  the merge. Passing checks and approval are not implicit merge authorization.
 - Make focused commits. Do not commit generated frontend assets under
   `internal/transport/httpapi/static/assets`.
 - Do not combine unrelated formatting or cleanup with a feature change.
@@ -278,5 +291,8 @@ A change is complete only when:
 - Security and workbook fidelity implications were reviewed.
 - `CHANGELOG.md` reflects material changes.
 - Repository documentation is still accurate.
+- The pull request links its issue, satisfies or updates its acceptance
+  criteria, and records verification results and remaining manual checks.
+- Required pull request policy checks pass.
 - No temporary HTML reports or QA artifacts are staged.
 - New text contains no em dash characters.

@@ -119,6 +119,8 @@ and this project intends to follow Semantic Versioning when releases begin.
 
 ### Changed
 
+- Required every repository change to use an issue-numbered branch and linked
+  pull request, with templates and automated metadata policy checks.
 - Renamed the product and repository architecture to `document-workspace` and
   repositioned XLSX as the first format adapter for a multi-format document
   collaboration platform.

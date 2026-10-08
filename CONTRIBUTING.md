@@ -10,20 +10,38 @@ across every affected boundary.
 Univer open-source packages are allowed. Univer Pro packages and services are
 not allowed unless the repository owner approves a new architecture decision.
 
+## Required Workflow
+
+All repository changes use an issue and a pull request, including documentation,
+maintenance, CI, and small fixes. Do not commit or push directly to `main`.
+
+1. Search open issues for the same problem and scope.
+2. Create or refine an issue with the problem, outcome, acceptance criteria,
+   scope, exclusions, risks, and required evidence.
+3. Create a branch from current `main` with the issue number in its name.
+4. Make focused commits and keep the issue updated if the scope changes.
+5. Open a pull request using the repository template and `Closes #<number>`.
+6. Record verification results, compatibility and security impact, manual
+   checks, and follow-up work in the pull request.
+7. Merge only after required checks pass and the repository owner approves it.
+
+If unrelated work is discovered, create a separate issue and pull request. A
+small change may use a short issue, but it does not bypass this workflow.
+
 ## Branches
 
 Use lowercase branch names in this form:
 
 ```text
-<type>/<short-description>
+<type>/<issue-number>-<short-description>
 ```
 
 Examples:
 
 ```text
-feat/ai-presence
-fix/revision-conflict
-docs/oss-architecture
+feat/42-ai-presence
+fix/57-revision-conflict
+docs/61-oss-architecture
 ```
 
 Use the same types accepted for commits: `feat`, `fix`, `docs`, `refactor`,
@@ -89,8 +107,11 @@ make audit
 
 ## Pull Requests
 
+- Link exactly the issue that defines the pull request scope by including
+  `Closes #<number>` in the linked-issue section.
 - Use a Conventional Commits title.
 - Explain the user or system problem before the implementation details.
+- State what is in scope and out of scope.
 - Include verification commands and results.
 - Call out XLSX compatibility, revision, security, and MCP contract impact.
 - Update `CHANGELOG.md` for material changes.
@@ -99,6 +120,8 @@ make audit
 - Use `make build` for release binaries so the frontend is generated before the
   Go binary embeds it.
 - Keep unrelated cleanup out of the pull request.
+- Keep the linked issue and pull request description current when the work
+  changes. Open follow-up issues for deferred or unrelated work.
 
 ## Documentation and Text
 
