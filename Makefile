@@ -8,6 +8,7 @@ web-install:
 	CI=true pnpm install --frozen-lockfile
 
 web-test:
+	CI=true pnpm --dir apps/web-editor run test
 	CI=true pnpm --dir apps/web-editor run check:oss
 	CI=true pnpm --dir apps/web-editor run typecheck
 
@@ -26,6 +27,7 @@ go-build:
 test: web-test go-test
 
 verify: web-build
+	CI=true pnpm --dir apps/web-editor run test
 	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOCACHE=$(GO_CACHE) $(GO) test ./...
 	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOCACHE=$(GO_CACHE) $(GO) test -race ./...
 	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOCACHE=$(GO_CACHE) $(GO) vet ./...

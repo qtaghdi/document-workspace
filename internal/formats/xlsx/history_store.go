@@ -40,6 +40,21 @@ func loadHistoryStore(workbookPath string, current []byte) (*historyStore, uint6
 		manifestPath: filepath.Join(dir, "manifest.json"),
 		pendingPath:  filepath.Join(dir, "manifest.pending.json"),
 	}
+	guard := &Session{historyStore: store}
+	unlock, lockErr := guard.acquireWriteLock()
+	if lockErr != nil {
+		return nil, 0, nil, nil, lockErr
+	}
+	defer unlock()
+	// Opening may have read the file before another process finished its save.
+	// Never reconcile a pending manifest against a stale pre-lock snapshot.
+	latest, readErr := os.ReadFile(workbookPath)
+	if readErr != nil {
+		return nil, 0, nil, nil, readErr
+	}
+	if hashBytes(latest) != hashBytes(current) {
+		return nil, 0, nil, nil, ErrExternalChange
+	}
 	if err := store.reconcilePending(hashBytes(current)); err != nil {
 		return nil, 0, nil, nil, err
 	}

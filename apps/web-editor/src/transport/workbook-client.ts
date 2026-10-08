@@ -26,5 +26,5 @@ export interface WorkbookClient {
   applyOperations(baseRevision: number, operations: WorkbookOperation[]): Promise<ApplyResponse>;
   restoreHistory(baseRevision: number, direction: HistoryDirection): Promise<ApplyResponse>;
   updatePresence(selection: SelectionChange): Promise<void>;
-  subscribe(onEvent: (event: WorkbookEvent) => void): EventSubscription;
+  subscribe(onEvent: (event: WorkbookEvent) => void, checkpoint: WorkbookSnapshot): EventSubscription;
 }

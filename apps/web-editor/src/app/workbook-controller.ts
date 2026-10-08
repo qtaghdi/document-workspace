@@ -22,6 +22,8 @@ const maxInitialCellsPerWorkbook = 500_000;
 
 export class WorkbookController {
   private revision = 0;
+  private recoveryRequired = false;
+  private pendingWrites = 0;
   private saveQueue = Promise.resolve();
   private presenceTimer: number | undefined;
   private pendingSelection: SelectionChange | undefined;
@@ -53,6 +55,11 @@ export class WorkbookController {
       for (const sheet of snapshot.sheets) {
         objects.push(await this.client.readSheetObjects(sheet));
       }
+      const confirmed = await this.client.getWorkbook();
+      if (confirmed.id !== snapshot.id || confirmed.revision !== snapshot.revision) {
+        this.requireRecovery(new Error('The workbook changed while loading.'));
+        return;
+      }
       this.revision = snapshot.revision;
       this.view.setWorkbookName(snapshot.name);
       const warnings = [...(snapshot.warnings ?? [])];
@@ -81,9 +88,9 @@ export class WorkbookController {
       for (const range of ranges) {
         this.recordLoadedRange(range.sheet, range.ref);
       }
-      this.eventSubscription = this.client.subscribe((event) => this.handleWorkbookEvent(event));
+      this.eventSubscription = this.client.subscribe((event) => this.handleWorkbookEvent(event), snapshot);
       this.eventSubscription.onerror = () => {
-        this.view.showRevision('Reconnecting to live events', this.revision);
+        this.requireRecovery(new Error('The live connection was interrupted.'));
       };
     } catch (error) {
       this.view.showError(error, this.revision);
@@ -91,21 +98,25 @@ export class WorkbookController {
   }
 
   private queueHistoryAction(direction: HistoryDirection): void {
+    if (this.recoveryRequired) return;
     const available = direction === 'undo' ? this.snapshot?.canUndo : this.snapshot?.canRedo;
     if (!available) {
       this.view.showRevision(direction === 'undo' ? 'Nothing to undo' : 'Nothing to redo', this.revision);
       return;
     }
     this.saveQueue = this.saveQueue.then(async () => {
+      if (this.recoveryRequired) return;
       this.view.showRevision(direction === 'undo' ? 'Undoing change' : 'Redoing change', this.revision);
       try {
         const response = await this.client.restoreHistory(this.revision, direction);
+        if (this.recoveryRequired) return;
         this.revision = response.workbook.revision;
         this.snapshot = response.workbook;
         this.view.setHistoryState(response.workbook.canUndo, response.workbook.canRedo);
+        this.recoveryRequired = true;
         window.location.reload();
       } catch (error) {
-        this.view.showError(error, this.revision);
+        this.requireRecovery(error);
       }
     });
   }
@@ -135,11 +146,15 @@ export class WorkbookController {
   }
 
   private queueOperation(operation: WorkbookOperation): void {
+    if (this.recoveryRequired) return;
+    this.pendingWrites++;
     const target = operationTarget(operation);
     this.saveQueue = this.saveQueue.then(async () => {
+      if (this.recoveryRequired) { this.pendingWrites--; return; }
       this.view.showRevision(`Saving ${operation.sheet}!${target}`, this.revision);
       try {
         const response = await this.client.applyOperations(this.revision, [operation]);
+        if (this.recoveryRequired) return;
         this.revision = response.workbook.revision;
         this.snapshot = response.workbook;
         this.view.setHistoryState(response.workbook.canUndo, response.workbook.canRedo);
@@ -148,8 +163,9 @@ export class WorkbookController {
         }
         this.view.showRevision('Saved', this.revision);
       } catch (error) {
-        this.view.showError(error, this.revision);
-        throw error;
+        this.requireRecovery(error);
+      } finally {
+        this.pendingWrites--;
       }
     });
     this.saveQueue = this.saveQueue.catch(() => undefined);
@@ -168,6 +184,7 @@ export class WorkbookController {
   }
 
   private async loadViewport(viewport: ViewportChange): Promise<void> {
+    if (this.recoveryRequired) return;
     const snapshot = this.snapshot;
     const dimensions = snapshot?.sheetDimensions.find((candidate) => candidate.name === viewport.sheet);
     if (!snapshot || !dimensions) {
@@ -185,11 +202,12 @@ export class WorkbookController {
     this.pendingRangeLoads.add(key);
     try {
       const range = await this.client.readRange(viewport.sheet, ref);
+      if (this.recoveryRequired) return;
       this.engine?.applyRange(range);
       this.recordLoadedRange(viewport.sheet, range.ref);
       this.view.showRevision(`Loaded ${viewport.sheet}!${ref}`, this.revision);
     } catch (error) {
-      this.view.showError(error, this.revision);
+      if (!this.recoveryRequired) this.view.showError(error, this.revision);
     } finally {
       this.pendingRangeLoads.delete(key);
     }
@@ -210,6 +228,7 @@ export class WorkbookController {
   }
 
   private queuePresence(selection: SelectionChange): void {
+    if (this.recoveryRequired) return;
     this.pendingSelection = selection;
     window.clearTimeout(this.presenceTimer);
     this.presenceTimer = window.setTimeout(() => {
@@ -217,17 +236,31 @@ export class WorkbookController {
       this.pendingSelection = undefined;
       if (next) {
         void this.client.updatePresence(next).catch((error) => {
-          this.view.showError(error, this.revision);
+          if (!this.recoveryRequired) this.view.showError(error, this.revision);
         });
       }
     }, 80);
   }
 
   private handleWorkbookEvent(event: WorkbookEvent): void {
+    if (this.recoveryRequired) return;
+    if (event.type === 'workbook.reload' && event.state === 'resync') {
+      this.requireRecovery(new Error('Live event history is incomplete or the server restarted.'));
+      return;
+    }
     if (event.actor !== 'ai') {
+      if (event.type !== 'presence.update' && event.type !== 'cell.typing' &&
+          event.revision > this.revision && this.pendingWrites === 0) {
+        this.requireRecovery(new Error('The workbook changed in another editor.'));
+      }
+      return;
+    }
+    if (this.pendingWrites > 0 && event.type !== 'presence.update' && event.type !== 'cell.typing') {
+      this.requireRecovery(new Error('The workbook changed while local edits were pending.'));
       return;
     }
     if (event.type === 'workbook.reload') {
+      this.recoveryRequired = true;
       window.location.reload();
       return;
     }
@@ -237,6 +270,22 @@ export class WorkbookController {
     }
     this.engine?.applyRemoteEvent(event);
     this.view.showAIPresence(event, this.revision);
+  }
+
+  private requireRecovery(error: unknown): void {
+    if (this.recoveryRequired) return;
+    this.recoveryRequired = true;
+    window.clearTimeout(this.presenceTimer);
+    window.clearTimeout(this.viewportTimer);
+    this.eventSubscription?.close();
+    const reason = error instanceof Error ? error.message : String(error);
+    this.view.showRecovery(reason, this.revision);
+    // Reconcile only by reading. Never retry a write with a newer base revision.
+    void this.client.getWorkbook().then((snapshot) => {
+      this.view.showRecovery(`${reason} The server currently reports revision ${snapshot.revision}.`, snapshot.revision);
+    }).catch(() => {
+      this.view.showRecovery(`${reason} The saved state could not be checked; reconnect before reloading.`, this.revision);
+    });
   }
 }
 

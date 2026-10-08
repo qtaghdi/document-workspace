@@ -1,6 +1,7 @@
 package xlsx
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -24,6 +25,10 @@ func Open(path string) (*Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve workbook path: %w", err)
 	}
+	abs, err = filepath.EvalSymlinks(abs)
+	if err != nil {
+		return nil, fmt.Errorf("resolve workbook target: %w", err)
+	}
 	info, err := os.Stat(abs)
 	if err != nil {
 		return nil, fmt.Errorf("inspect workbook: %w", err)
@@ -39,7 +44,7 @@ func Open(path string) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := excelize.OpenFile(abs)
+	f, err := excelize.OpenReader(bytes.NewReader(current))
 	if err != nil {
 		return nil, fmt.Errorf("open workbook: %w", err)
 	}
@@ -54,6 +59,8 @@ func Open(path string) (*Session, error) {
 		return nil, err
 	}
 	return &Session{
+		currentHash:  hashBytes(current),
+		persistence:  diskPersistence(),
 		id:           randomID(),
 		path:         abs,
 		file:         f,
@@ -80,16 +87,7 @@ func (s *Session) Close() error {
 func (s *Session) Snapshot() Snapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return Snapshot{
-		ID:              s.id,
-		Name:            filepath.Base(s.path),
-		Sheets:          append([]string(nil), s.file.GetSheetList()...),
-		SheetDimensions: s.sheetDimensionsLocked(),
-		Warnings:        append([]FeatureWarning(nil), s.warnings...),
-		CanUndo:         len(s.undoHistory) > 0,
-		CanRedo:         len(s.redoHistory) > 0,
-		Revision:        s.revision,
-	}
+	return s.snapshotLocked()
 }
 
 func (s *Session) Apply(baseRevision uint64, actor string, operations []Operation) (Snapshot, error) {
@@ -109,10 +107,35 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 			return Snapshot{}, fmt.Errorf("operation %d: %w", i, err)
 		}
 	}
-	previous, historyErr := os.ReadFile(s.path)
+	unlock, err := s.acquireWriteLock()
+	if err != nil {
+		return Snapshot{}, err
+	}
+	defer unlock()
+	previous, historyErr := s.readCurrentLocked()
 	if historyErr != nil {
 		return Snapshot{}, fmt.Errorf("capture workbook history: %w", historyErr)
 	}
+	if err := s.reconcileHistoryLocked(); err != nil {
+		return Snapshot{}, err
+	}
+	// Mutate a candidate, never the authoritative in-memory file. Rollback must
+	// not depend on a disk reload that can fail or import an external edit.
+	candidate, err := excelize.OpenReader(bytes.NewReader(previous))
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("prepare workbook transaction: %w", err)
+	}
+	original := s.file
+	s.file = candidate
+	committed := false
+	defer func() {
+		if committed {
+			_ = original.Close()
+		} else {
+			s.file = original
+			_ = candidate.Close()
+		}
+	}()
 
 	nextRevision := s.revision + 1
 	for _, op := range operations {
@@ -126,24 +149,21 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 		if isObjectOperation(op.Type) && op.TargetCell != "" {
 			selection = op.TargetCell
 		}
-		s.publishLocked(Event{Revision: nextRevision, Actor: actor, Type: "presence.update", Sheet: op.Sheet, Range: selection, State: "editing"})
+		s.publishLocked(Event{Revision: s.revision, Actor: actor, Type: "presence.update", Sheet: op.Sheet, Range: selection, State: "editing"})
 		if isObjectOperation(op.Type) {
 			if err := s.applyObjectOperationLocked(op); err != nil {
-				s.reloadLocked()
 				return Snapshot{}, err
 			}
 			continue
 		}
 		if isStructuralOperation(op.Type) {
 			if err := s.applyStructuralOperationLocked(op); err != nil {
-				s.reloadLocked()
 				return Snapshot{}, err
 			}
 			continue
 		}
 		if op.Type == "set_format" {
 			if err := s.applyFormatLocked(op); err != nil {
-				s.reloadLocked()
 				return Snapshot{}, err
 			}
 			continue
@@ -159,14 +179,13 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 				err = s.file.UnmergeCell(op.Sheet, start, end)
 			}
 			if err != nil {
-				s.reloadLocked()
 				return Snapshot{}, fmt.Errorf("apply %s to %s!%s: %w", op.Type, op.Sheet, op.Range, err)
 			}
 			continue
 		}
 		changes, _ := s.operationChanges(op)
 		if len(changes) == 1 {
-			s.publishLocked(Event{Revision: nextRevision, Actor: actor, Type: "cell.typing", Sheet: op.Sheet, Cell: changes[0].Cell, Text: changeText(changes[0])})
+			s.publishLocked(Event{Revision: s.revision, Actor: actor, Type: "cell.typing", Sheet: op.Sheet, Cell: changes[0].Cell, Text: changeText(changes[0])})
 		}
 		for _, change := range changes {
 			var err error
@@ -176,7 +195,6 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 				err = s.file.SetCellValue(op.Sheet, change.Cell, change.Value)
 			}
 			if err != nil {
-				s.reloadLocked()
 				return Snapshot{}, fmt.Errorf("apply %s to %s!%s: %w", op.Type, op.Sheet, change.Cell, err)
 			}
 		}
@@ -186,27 +204,24 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 		var dimensionsErr error
 		structuralDimensions, dimensionsErr = inspectSheetDimensions(s.file)
 		if dimensionsErr != nil {
-			s.reloadLocked()
 			return Snapshot{}, dimensionsErr
 		}
 	}
 	nextContent, err := s.serializeLocked()
 	if err != nil {
-		s.reloadLocked()
 		return Snapshot{}, err
 	}
 	nextUndo := appendBoundedHistory(append([][]byte(nil), s.undoHistory...), previous)
 	nextRedo := [][]byte(nil)
 	if err := s.historyStore.prepare(nextRevision, nextContent, nextUndo, nextRedo); err != nil {
-		s.reloadLocked()
 		return Snapshot{}, err
 	}
 	if err := s.replaceBytesLocked(nextContent); err != nil {
 		s.historyStore.abort()
-		s.reloadLocked()
 		return Snapshot{}, err
 	}
 	historyCommitErr := s.historyStore.commit()
+	committed = true
 	s.revision = nextRevision
 	s.undoHistory = nextUndo
 	s.redoHistory = nextRedo
@@ -264,12 +279,35 @@ func (s *Session) RestoreHistory(baseRevision uint64, actor, direction string) (
 	if len(*source) == 0 {
 		return Snapshot{}, fmt.Errorf("nothing to %s", direction)
 	}
-	current, err := os.ReadFile(s.path)
+	unlock, err := s.acquireWriteLock()
+	if err != nil {
+		return Snapshot{}, err
+	}
+	defer unlock()
+	current, err := s.readCurrentLocked()
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("capture current workbook for %s: %w", direction, err)
 	}
+	if err := s.reconcileHistoryLocked(); err != nil {
+		return Snapshot{}, err
+	}
 	targetIndex := len(*source) - 1
 	target := (*source)[targetIndex]
+	candidate, err := excelize.OpenReader(bytes.NewReader(target))
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("prepare history restore: %w", err)
+	}
+	dimensions, err := inspectSheetDimensions(candidate)
+	if err != nil {
+		_ = candidate.Close()
+		return Snapshot{}, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = candidate.Close()
+		}
+	}()
 	nextSource := append([][]byte(nil), (*source)[:targetIndex]...)
 	nextDestination := appendBoundedHistory(append([][]byte(nil), (*destination)...), current)
 	nextRevision := s.revision + 1
@@ -287,11 +325,9 @@ func (s *Session) RestoreHistory(baseRevision uint64, actor, direction string) (
 		return Snapshot{}, err
 	}
 	historyCommitErr := s.historyStore.commit()
-	s.reloadLocked()
-	dimensions, err := inspectSheetDimensions(s.file)
-	if err != nil {
-		return Snapshot{}, err
-	}
+	_ = s.file.Close()
+	s.file = candidate
+	committed = true
 	s.dimensions = dimensions
 	s.undoHistory = nextUndo
 	s.redoHistory = nextRedo
@@ -374,6 +410,7 @@ func (s *Session) hasSheet(name string) bool {
 
 func (s *Session) snapshotLocked() Snapshot {
 	return Snapshot{
+		Sequence:        s.sequence,
 		ID:              s.id,
 		Name:            filepath.Base(s.path),
 		Sheets:          append([]string(nil), s.file.GetSheetList()...),

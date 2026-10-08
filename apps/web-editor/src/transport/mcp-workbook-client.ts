@@ -1,7 +1,7 @@
 import { App, PostMessageTransport } from '@modelcontextprotocol/ext-apps';
 import type { z } from 'zod';
 
-import type { HistoryDirection, SelectionChange, WorkbookEvent, WorkbookOperation } from '../contracts';
+import type { HistoryDirection, SelectionChange, WorkbookEvent, WorkbookOperation, WorkbookSnapshot } from '../contracts';
 import {
   applyResponseSchema,
   eventPollResponseSchema,
@@ -48,10 +48,10 @@ export class MCPWorkbookClient implements WorkbookClient {
     await this.callTool('update_user_presence', { ...selection }, presenceResponseSchema);
   }
 
-  subscribe(onEvent: (event: WorkbookEvent) => void): EventSubscription {
+  subscribe(onEvent: (event: WorkbookEvent) => void, checkpoint: WorkbookSnapshot): EventSubscription {
     let closed = false;
     let timer: number | undefined;
-    let afterSequence = 0;
+    let afterSequence = checkpoint.sequence;
     const subscription: EventSubscription = {
       onerror: null,
       close: () => {
@@ -62,6 +62,12 @@ export class MCPWorkbookClient implements WorkbookClient {
     const poll = async (): Promise<void> => {
       try {
         const response = await this.callTool('get_events', { afterSequence }, eventPollResponseSchema);
+        if (closed) return;
+        if (response.workbook.id !== checkpoint.id) {
+          onEvent({ type: 'workbook.reload', state: 'resync', actor: 'system',
+            sequence: response.workbook.sequence, revision: response.workbook.revision });
+          return;
+        }
         for (const event of response.events) {
           afterSequence = Math.max(afterSequence, event.sequence);
           onEvent(event);

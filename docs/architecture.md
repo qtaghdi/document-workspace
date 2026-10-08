@@ -149,6 +149,23 @@ stable for upgrade compatibility even though the product has been renamed.
 Initial worksheet data loads in bounded ranges. The browser requests aligned
 tiles as the viewport moves, while Univer keeps the grid virtualized.
 
+Writes mutate a candidate workbook and retain the authoritative in-memory file
+until persistence succeeds. History restoration also parses and inspects its
+candidate before disk replacement. Failed preparation, writes, sync, close,
+or replacement leave the previous revision and in-memory state intact. A
+workbook saved successfully with a failed history-manifest finalization is
+reported as saved with a history warning; the pending manifest is retained and
+must reconcile before the next write.
+
+A sidecar `write.lock` directory serializes cooperating writers and history
+recovery. The source hash is checked before mutation and immediately before
+replacement, including undo/redo. Changed, removed, or non-regular sources are
+rejected. Symlink paths are resolved on opening. The lock does not coordinate
+Excel, hard-link aliases, network filesystems, or other non-cooperating writers;
+a final check-to-rename race remains. Do not edit the same file simultaneously
+in an external application. A crash leaves the lock in place and fails closed.
+See [recovery operations](xlsx-recovery.md) for safe manual recovery and limits.
+
 ## XLSX Compatibility
 
 The browser maps supported validation and conditional-formatting rules to OSS
@@ -170,6 +187,19 @@ SSE is used for the current server-to-browser event flow. Events include a
 sequence, revision, actor, type, format location, and operation-specific data.
 The service retains a bounded replay window and supports reconnect with
 `Last-Event-ID`.
+Snapshots include an event sequence checkpoint. New browser subscriptions start
+there, avoiding historical structural edits already included in the snapshot.
+A replay gap or invalid future cursor returns a system `workbook.reload` event
+with `state: resync`; slow subscribers are disconnected instead of silently
+losing events. Browser subscriptions also track the session identity so a
+restarted process cannot reuse an old cursor unnoticed.
+
+After a failed write, connection interruption, or resync signal, the controller
+pauses all queued writes and checks the server snapshot without retrying an
+operation. The recovery panel leaves drafts visible and offers an explicit
+reload. It never treats a newer server revision as proof that a specific
+uncertain write succeeded. This is conservative reconciliation, not a durable
+idempotency-receipt API.
 
 Typing animation and cursor movement are presentation state. Durable writes
 occur at operation or batch granularity, never once per displayed character.

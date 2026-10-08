@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 
-import type { HistoryDirection, SelectionChange, WorkbookEvent, WorkbookOperation } from '../contracts';
+import type { HistoryDirection, SelectionChange, WorkbookEvent, WorkbookOperation, WorkbookSnapshot } from '../contracts';
 import {
   applyResponseSchema,
   errorResponseSchema,
@@ -67,8 +67,9 @@ export class HTTPWorkbookClient implements WorkbookClient {
     }
   }
 
-  subscribe(onEvent: (event: WorkbookEvent) => void): EventSubscription {
-    const source = new EventSource('/api/events');
+  subscribe(onEvent: (event: WorkbookEvent) => void, checkpoint: WorkbookSnapshot): EventSubscription {
+    const query = new URLSearchParams({ after: String(checkpoint.sequence), session: checkpoint.id });
+    const source = new EventSource(`/api/events?${query}`);
     let onerror: ((error: unknown) => void) | null = null;
     source.addEventListener('workbook', (message) => {
       try {

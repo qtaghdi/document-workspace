@@ -139,7 +139,8 @@ PDF is treated as a fixed-layout document, not a normal source editor.
 
 ## Immediate Next Work
 
-1. Implement the XLSX checklist's recovery and overwrite protections.
+1. Review the implemented [recovery protections](xlsx-recovery.md) against the
+   release candidate, including documented external-writer and crash limits.
 2. Add Excel evidence and close candidate host, formula, UI, and packaging gates.
 3. Release the verified XLSX subset, then extend object editing separately.
 4. Run the DOCX preservation experiment before selecting its editor or extracting

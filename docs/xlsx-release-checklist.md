@@ -30,6 +30,12 @@ cannot be established. No server calculation engine is selected by this spec.
 
 ## Evidence Status
 
+Recovery implementation now has [dedicated tests and an operator guide](xlsx-recovery.md).
+X-03 through X-05 have implementation evidence for candidate rollback, failure
+injection, source hash guards, cooperating writer locks, replay reset, and paused
+browser queues. They remain candidate sign-off gates, with the external-writer
+race and crash-durability limits documented in that guide.
+
 Existing evidence means a test or historical record exists, not that this
 release candidate has passed it. Every checkbox remains open until evidence is
 recorded against the candidate commit. A documentation-only change does not

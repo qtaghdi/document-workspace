@@ -18,6 +18,7 @@ const cellInputSchema = z.object({
 const cellChangeSchema = cellInputSchema.extend({ cell: z.string() });
 
 export const workbookSnapshotSchema = z.object({
+  sequence: z.number().int().nonnegative(),
   id: z.string(),
   name: z.string(),
   sheets: z.array(z.string()),
@@ -109,7 +110,7 @@ export const workbookEventSchema = z.discriminatedUnion('type', [
   z.object({
     ...eventBase,
     type: z.literal('workbook.reload'),
-    state: z.enum(['undo', 'redo', 'objects']),
+    state: z.enum(['undo', 'redo', 'objects', 'resync']),
   }),
   z.object({
     ...eventBase,

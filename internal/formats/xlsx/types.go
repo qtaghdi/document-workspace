@@ -175,6 +175,7 @@ type Presence struct {
 }
 
 type Snapshot struct {
+	Sequence        uint64            `json:"sequence"`
 	ID              string            `json:"id"`
 	Name            string            `json:"name"`
 	Sheets          []string          `json:"sheets"`
@@ -197,6 +198,8 @@ type SheetDimensions struct {
 }
 
 type Session struct {
+	currentHash  string
+	persistence  persistenceIO
 	mu           sync.RWMutex
 	id           string
 	path         string

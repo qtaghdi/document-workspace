@@ -127,7 +127,7 @@ func (s *Server) applyOperations(w http.ResponseWriter, r *http.Request) {
 	snapshot, err := s.session.Apply(input.BaseRevision, "human", input.Operations)
 	if err != nil {
 		status := http.StatusBadRequest
-		if errors.Is(err, xlsx.ErrRevisionConflict) {
+		if errors.Is(err, xlsx.ErrRevisionConflict) || errors.Is(err, xlsx.ErrExternalChange) || errors.Is(err, xlsx.ErrWriterBusy) {
 			status = http.StatusConflict
 		}
 		writeError(w, status, err)
@@ -149,7 +149,7 @@ func (s *Server) restoreHistory(w http.ResponseWriter, r *http.Request) {
 	snapshot, err := s.session.RestoreHistory(input.BaseRevision, "human", direction)
 	if err != nil {
 		status := http.StatusBadRequest
-		if errors.Is(err, xlsx.ErrRevisionConflict) {
+		if errors.Is(err, xlsx.ErrRevisionConflict) || errors.Is(err, xlsx.ErrExternalChange) || errors.Is(err, xlsx.ErrWriterBusy) {
 			status = http.StatusConflict
 		}
 		writeError(w, status, err)
@@ -168,7 +168,11 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	var after uint64
-	if value := r.Header.Get("Last-Event-ID"); value != "" {
+	value := r.Header.Get("Last-Event-ID")
+	if value == "" {
+		value = r.URL.Query().Get("after")
+	}
+	if value != "" {
 		parsed, err := strconv.ParseUint(value, 10, 64)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, errors.New("invalid Last-Event-ID"))
@@ -176,8 +180,13 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		}
 		after = parsed
 	}
+	if session := r.URL.Query().Get("session"); session != "" && session != s.session.Snapshot().ID {
+		after = ^uint64(0)
+	}
 	events, cancel := s.session.Subscribe(after)
 	defer cancel()
+	_, _ = io.WriteString(w, ": connected\n\n")
+	flusher.Flush()
 	heartbeat := time.NewTicker(20 * time.Second)
 	defer heartbeat.Stop()
 	for {

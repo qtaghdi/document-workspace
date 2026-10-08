@@ -1,4 +1,5 @@
 export interface WorkbookSnapshot {
+  sequence: number;
   id: string;
   name: string;
   sheets: string[];
@@ -176,7 +177,7 @@ interface EventBase {
 export type WorkbookEvent =
   | (EventBase & {
       type: 'workbook.reload';
-      state: 'undo' | 'redo' | 'objects';
+      state: 'undo' | 'redo' | 'objects' | 'resync';
     })
   | (EventBase & {
       type: 'presence.update';

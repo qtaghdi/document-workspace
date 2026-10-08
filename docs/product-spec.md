@@ -42,7 +42,7 @@ Creation, editing an existing source, and conversion are separate workflows.
 | AUTH-02 | Review a proposed change before committing when requested | Planned: no generic staged proposal or review UI |
 | COMP-01 | Report preservation, rendering, and editing limits separately | Partial: XLSX notices and corpus; no complete capability report |
 | HOST-01 | Work through MCP, with an embedded editor or browser fallback | Partial: transports implemented; certification varies by host and mode |
-| REC-01 | Recover safely from disconnects, retries, and external file changes | Partial: event replay and history checks; full recovery contract pending |
+| REC-01 | Recover safely from disconnects, retries, and external file changes | Partial: candidate rollback, source hash guards, writer lock, replay resync, and paused browser write queues; external-writer races and durable receipts remain limited |
 
 ## Document Lifecycle
 
@@ -101,8 +101,11 @@ authoritative snapshot when a replay gap cannot be filled. A lost response
 after persistence must be resolved before retrying a write. A future retry
 contract must distinguish already-committed operations from new operations.
 External file replacement must be detected before overwriting newer external
-content. End-to-end retry and external-write protection remain release work;
-existing history hash checks alone do not satisfy this requirement.
+content. Current behavior uses explicit reload after uncertain outcomes, with
+no automatic write retry. Source hash guards and cooperating writer locks are
+implemented, but non-cooperating applications can still race final replacement.
+See [recovery operations](xlsx-recovery.md) for the tested boundary and remaining
+limits. Durable operation receipts remain future work.
 
 ## Permissions and Review
 

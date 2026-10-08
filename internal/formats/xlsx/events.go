@@ -3,6 +3,9 @@ package xlsx
 func (s *Session) EventsAfter(after uint64) ([]Event, Snapshot) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	if s.replayGapLocked(after) {
+		return []Event{s.resyncEventLocked()}, s.snapshotLocked()
+	}
 	events := make([]Event, 0)
 	for _, event := range s.history {
 		if event.Sequence > after {
@@ -16,9 +19,13 @@ func (s *Session) Subscribe(after uint64) (<-chan Event, func()) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	replay := make([]Event, 0)
-	for _, event := range s.history {
-		if event.Sequence > after {
-			replay = append(replay, event)
+	if s.replayGapLocked(after) {
+		replay = append(replay, s.resyncEventLocked())
+	} else {
+		for _, event := range s.history {
+			if event.Sequence > after {
+				replay = append(replay, event)
+			}
 		}
 	}
 	ch := make(chan Event, len(replay)+64)
@@ -47,6 +54,17 @@ func (s *Session) publishLocked(event Event) {
 		select {
 		case ch <- event:
 		default:
+			// Never silently drop a commit. Disconnect so the client reconciles.
+			delete(s.subscribers, ch)
+			close(ch)
 		}
 	}
+}
+
+func (s *Session) replayGapLocked(after uint64) bool {
+	return after > s.sequence || (len(s.history) > 0 && after < s.history[0].Sequence-1)
+}
+
+func (s *Session) resyncEventLocked() Event {
+	return Event{Sequence: s.sequence, Revision: s.revision, Actor: "system", Type: "workbook.reload", State: "resync"}
 }

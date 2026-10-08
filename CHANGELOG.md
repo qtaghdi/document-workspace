@@ -9,6 +9,13 @@ and this project intends to follow Semantic Versioning when releases begin.
 
 ### Added
 
+- Added source hash checks and cooperating writer locks for XLSX edits and
+  history restoration, with conflict responses for external changes.
+- Added event sequence checkpoints, replay-gap resync, and slow-subscriber
+  disconnects, plus browser recovery that pauses writes without blind retries.
+- Added failure-injection, HTTP/SSE, and frontend recovery regression tests.
+- Isolated XLSX mutations and history restoration in candidates so failed
+  persistence retains authoritative memory, revisions, and undo/redo state.
 - Added an evidence-based XLSX stable release checklist with recovery, native
   fidelity, formula, host, and packaging gates and an explicit initial subset.
 - Added a DOCX preservation experiment specification covering bounded edits,

@@ -91,6 +91,19 @@ export class AppView {
     this.showRevision('Save failed', revision);
   }
 
+  showRecovery(message: string, revision: number): void {
+    this.errorPanel.textContent = `${message} Editing is paused. Copy any unsaved drafts before reloading. Do not repeat an uncertain write until you have checked the saved workbook. `;
+    const reload = this.errorPanel.ownerDocument.createElement('button');
+    reload.type = 'button';
+    reload.className = 'rounded border px-3 py-1 font-semibold underline';
+    reload.textContent = 'Reload saved workbook';
+    reload.onclick = () => window.location.reload();
+    this.errorPanel.append(reload);
+    this.errorPanel.classList.remove('hidden');
+    this.setHistoryState(false, false);
+    this.showRevision('Recovery required', revision);
+  }
+
   dispose(): void {
     window.clearTimeout(this.presenceTimer);
     this.undoButton.removeEventListener('click', this.handleUndo);
