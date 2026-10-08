@@ -45,9 +45,14 @@ release candidate has passed it. Every checkbox remains open until evidence is
 recorded against the candidate commit. A documentation-only change does not
 require rerunning the application suite.
 
+XLSX package preflight now rejects non-regular sources, invalid OOXML ZIP
+containers, encrypted entries, unsafe or duplicate part names, more than 10,000
+parts, parts larger than 256 MiB expanded, total expansion above 512 MiB, and
+compressed sources above 100 MiB before the workbook parser runs.
+
 | Gate | Requirements | Existing evidence | Remaining closure condition |
 | --- | --- | --- | --- |
-| X-01 Input boundaries | DOC-01 | Size checks in `xlsx.Open`; parser errors | Reject corrupt, oversized, restricted, and unsupported inputs without source mutation; declare bounded expanded-package handling |
+| X-01 Input boundaries | DOC-01 | Regular-file and OOXML package preflight; compressed, expanded, part-count, duplicate-name, unsafe-path, encryption, corrupt-input, and no-mutation tests | Candidate run and review of supported restricted or encrypted input messaging |
 | X-02 Transactions | EDIT-01, EDIT-03, SAVE-01 | Persistence, stale-revision, paste-shape, and shared-session tests | Mixed valid/invalid batch; simultaneous same-revision writes; verify content, revision, and commit events |
 | X-03 Persistence failures | SAVE-01, REC-01 | Same-directory temporary write and rename | Inject temporary creation, write, sync, and rename failures; verify disk and memory recovery; no false committed event |
 | X-04 External writers | REC-01 | History reset test after external replacement | Detect changes during a live session before overwrite; define remaining race and single-writer policy |

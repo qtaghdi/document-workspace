@@ -33,12 +33,19 @@ func Open(path string) (*Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("inspect workbook: %w", err)
 	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("workbook must be a regular file")
+	}
 	if info.Size() > maxWorkbookBytes {
 		return nil, fmt.Errorf("workbook exceeds %d bytes", maxWorkbookBytes)
 	}
 	current, err := os.ReadFile(abs)
 	if err != nil {
 		return nil, fmt.Errorf("read workbook: %w", err)
+	}
+	packageLimits := defaultPackageLimits()
+	if err := validateWorkbookBytes(current, packageLimits); err != nil {
+		return nil, err
 	}
 	historyStore, revision, undoHistory, redoHistory, err := loadHistoryStore(abs, current)
 	if err != nil {
@@ -59,19 +66,20 @@ func Open(path string) (*Session, error) {
 		return nil, err
 	}
 	return &Session{
-		currentHash:  hashBytes(current),
-		persistence:  diskPersistence(),
-		id:           randomID(),
-		path:         abs,
-		file:         f,
-		revision:     revision,
-		subscribers:  make(map[chan Event]struct{}),
-		dimensions:   dimensions,
-		warnings:     warnings,
-		undoHistory:  undoHistory,
-		redoHistory:  redoHistory,
-		historyStore: historyStore,
-		hasFormulas:  hasFormulas,
+		currentHash:   hashBytes(current),
+		persistence:   diskPersistence(),
+		id:            randomID(),
+		path:          abs,
+		file:          f,
+		revision:      revision,
+		subscribers:   make(map[chan Event]struct{}),
+		dimensions:    dimensions,
+		warnings:      warnings,
+		undoHistory:   undoHistory,
+		redoHistory:   redoHistory,
+		historyStore:  historyStore,
+		hasFormulas:   hasFormulas,
+		packageLimits: packageLimits,
 	}, nil
 }
 
@@ -304,6 +312,9 @@ func (s *Session) RestoreHistory(baseRevision uint64, actor, direction string) (
 	}
 	targetIndex := len(*source) - 1
 	target := (*source)[targetIndex]
+	if err := validateWorkbookBytes(target, s.packageLimits); err != nil {
+		return Snapshot{}, fmt.Errorf("validate history restore: %w", err)
+	}
 	candidate, err := excelize.OpenReader(bytes.NewReader(target))
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("prepare history restore: %w", err)

@@ -215,6 +215,12 @@ untrusted. Local mode uses separate random browser and MCP credentials, strict
 cookies, same-origin write checks, bounded requests, and loopback-only fallback
 listeners. Stdio stdout remains protocol-only.
 
+Before parsing an XLSX file, the adapter requires a regular OOXML ZIP package
+and rejects encrypted entries, unsafe or duplicate part names, more than 10,000
+parts, any part larger than 256 MiB when expanded, more than 512 MiB of total
+expanded data, and more than 100 MiB of compressed source data. These are safety
+ceilings, not demonstrated performance capacity.
+
 Hosted mode will require identity, per-document authorization, immutable object
 versions, tenant isolation, audit storage, quotas, and background processing.
 

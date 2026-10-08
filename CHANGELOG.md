@@ -161,6 +161,8 @@ and this project intends to follow Semantic Versioning when releases begin.
 
 ### Security
 
+- Added XLSX package preflight limits for expanded bytes, individual parts, and
+  entry count, with rejection of encrypted, duplicate, and unsafe ZIP entries.
 - Updated Univer to 1.0.2 after dependency audit and verified that the installed
   dependency tree reports no known vulnerabilities.
 - Allowed only the data and blob image, font, and worker sources required by

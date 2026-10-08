@@ -92,6 +92,9 @@ func (s *Session) reconcileHistoryLocked() error {
 }
 
 func (s *Session) replaceBytesLocked(content []byte) error {
+	if err := validateWorkbookBytes(content, s.packageLimits); err != nil {
+		return fmt.Errorf("validate workbook candidate: %w", err)
+	}
 	tmp, err := s.persistence.createTemp(filepath.Dir(s.path), ".document-workspace-*.tmp")
 	if err != nil {
 		return fmt.Errorf("create temporary workbook: %w", err)
