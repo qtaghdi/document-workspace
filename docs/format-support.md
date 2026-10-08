@@ -113,10 +113,11 @@ visual tolerances, including fonts and rendering environment, before approval.
 
 ## Next Detailed Specifications
 
-1. XLSX: define the stable subset, formula-result policy, remaining object work,
-   recovery gaps, and Microsoft Excel plus desktop-host release evidence.
-2. DOCX: define block identity, operation targets, creation scope, preservation
-   strategy, and an engine-selection prototype with measurable results.
+1. Execute the [XLSX release checklist](xlsx-release-checklist.md): stable subset,
+   formula policy, recovery gates, corpus, and host evidence. Image insertion
+   and advanced chart authoring are explicitly deferred from this first subset.
+2. Execute the [DOCX preservation prototype](docx-preservation-prototype.md):
+   revision-scoped targets, bounded operations, creation, and native reopen gates.
 3. Extract shared runtime contracts only after XLSX and DOCX validate them.
 4. Detail PPTX, HWPX, and PDF when their implementation milestone approaches.
    Keep binary HWP as a separate research decision.

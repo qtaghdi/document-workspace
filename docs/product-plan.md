@@ -54,13 +54,16 @@ Completed foundations include:
 
 Remaining XLSX release work:
 
-1. Add a provenance-recorded Microsoft Excel fixture.
-2. Add image insertion.
-3. Add chart type, series, axis, legend, and style editing where fidelity can be
-   verified without proprietary dependencies.
-4. Complete live Claude and Codex embedded-host certification.
-5. Decide formula calculation scope.
-6. Expand advanced validation, conditional formatting, and object coverage.
+1. Close persistence, external-writer, and disconnect/retry safety gates.
+2. Add a provenance-recorded Microsoft Excel fixture and native reopen evidence.
+3. Certify the claimed Claude and Codex modes, distinguishing embedded UI from
+   browser fallback rather than requiring unsupported host capabilities.
+4. Verify and disclose formula storage, cache, and browser-calculation limits.
+5. Complete candidate UI, resource-limit, access, and packaging checks.
+
+The [XLSX release checklist](xlsx-release-checklist.md) defines the first stable
+subset. Image insertion, chart type/series/axis/legend/style editing, and broader
+advanced rule coverage remain follow-up work outside that initial subset.
 
 The initial XLSX release does not promise macro execution, encrypted workbook
 editing, a complete Excel formula engine, or preservation of every proprietary
@@ -98,6 +101,8 @@ Exit criteria:
 
 DOCX is the recommended second adapter because it tests the shared session
 model without requiring fixed-layout reconstruction.
+The [preservation prototype](docx-preservation-prototype.md) defines the first
+experiment. Its results are pending; no DOCX engine has been selected.
 
 ## Phase 4: PPTX Adapter
 
@@ -134,11 +139,8 @@ PDF is treated as a fixed-layout document, not a normal source editor.
 
 ## Immediate Next Work
 
-1. Detail the XLSX stable-release checklist and DOCX preservation prototype
-   using the shared specification and format matrix. Repository migration and
-   its regression verification are complete.
-2. Finish the remaining XLSX object editing work.
-3. Add the Microsoft Excel compatibility fixture and final desktop-host checks.
-4. Release the XLSX adapter as the first stable document-workspace capability.
-5. Prototype DOCX preservation and operation boundaries before extracting a
-   generic document session.
+1. Implement the XLSX checklist's recovery and overwrite protections.
+2. Add Excel evidence and close candidate host, formula, UI, and packaging gates.
+3. Release the verified XLSX subset, then extend object editing separately.
+4. Run the DOCX preservation experiment before selecting its editor or extracting
+   a generic document session. The experiment can proceed independently on copies.

@@ -9,6 +9,10 @@ and this project intends to follow Semantic Versioning when releases begin.
 
 ### Added
 
+- Added an evidence-based XLSX stable release checklist with recovery, native
+  fidelity, formula, host, and packaging gates and an explicit initial subset.
+- Added a DOCX preservation experiment specification covering bounded edits,
+  revision-scoped targets, fixtures, structural comparisons, and Word reopen gates.
 - Added a shared product specification covering document lifecycle, revisioned
   collaboration, host permissions, proposed review, persistence, and recovery.
 - Added a format support matrix separating current XLSX capabilities from
