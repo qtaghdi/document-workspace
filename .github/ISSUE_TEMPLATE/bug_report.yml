@@ -29,6 +29,23 @@ body:
     validations:
       required: true
   - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Describe data safety, compatibility, security, or workflow consequences.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List the regression checks and observable behavior required to close the bug.
+      placeholder: |
+        - [ ] A regression test fails before the fix and passes after it.
+        - [ ] Existing document content remains unchanged outside the target behavior.
+    validations:
+      required: true
+  - type: textarea
     id: environment
     attributes:
       label: Environment
@@ -54,6 +71,13 @@ body:
     attributes:
       label: Relevant logs or screenshots
       description: Remove workbook contents, credentials, tokens, and personal data.
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: Identify related work that should be tracked separately.
+    validations:
+      required: true
   - type: checkboxes
     id: safety
     attributes:

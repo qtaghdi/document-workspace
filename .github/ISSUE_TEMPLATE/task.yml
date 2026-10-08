@@ -1,0 +1,69 @@
+name: Engineering task
+description: Track documentation, maintenance, security, research, or release work.
+title: "chore: "
+labels: []
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Task type
+      options:
+        - Documentation
+        - Maintenance
+        - Security
+        - Compatibility evidence
+        - Research or prototype
+        - CI and release
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Explain why the task is needed and what is unclear or incomplete today.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the durable repository or operational result.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] Repository guidance is updated.
+        - [ ] Required automated checks pass.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Identify the documents, automation, or system boundaries included.
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: Identify related work that must be tracked separately.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: List the commands, review evidence, or manual checks required.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and constraints
+      description: Note compatibility, security, cost, host, or workflow constraints.
+    validations:
+      required: true
