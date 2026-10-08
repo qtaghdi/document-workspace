@@ -27,6 +27,10 @@ of changed formulas, changed dependencies, unsupported functions, external
 references, and stale caches, including reopening in Excel. The release must
 document when recalculation is required and show a limitation where a result
 cannot be established. No server calculation engine is selected by this spec.
+The structured policy, cached-value labeling, browser warning, and native
+recalculation request are implemented and documented in the
+[XLSX formula policy](xlsx-formula-policy.md). Native Excel evidence remains a
+release gate.
 
 ## Evidence Status
 
@@ -50,7 +54,7 @@ require rerunning the application suite.
 | X-05 Disconnect and retry | REC-01 | Bounded event replay | Test lost response after commit, exhausted replay, slow consumer, and reconnect; reconcile before retry without duplicating edits |
 | X-06 History | HIST-01 | Undo/redo, restart, and replacement tests | Test snapshot size/count limits and unavailable history in UI; confirm monotonically increasing revision |
 | X-07 Native fidelity | COMP-01 | Generated and LibreOffice corpus; object round-trip tests | Add provenance-recorded Excel fixture; verify native reopen and unrelated content across all supported edit families |
-| X-08 Formula expectations | COMP-01 | Formula storage and read tests | Verify and expose formula policy above; no unsupported result presented as verified calculation |
+| X-08 Formula expectations | COMP-01 | Formula storage, value-status, structured-policy, warning, and native-recalculation property tests | Verify changed formulas, dependencies, unsupported functions, external references, and stale caches in native Excel |
 | X-09 Host workflows | HOST-01, AUTH-01 | Historical tools and Codex browser fallback records | Candidate-level Claude and Codex tests with explicit mode, versions, permissions, human/AI edits, conflict, and native reopen |
 | X-10 UI and limits | EDIT-02, COMP-01 | Virtualized loading, presence, compatibility notices | Keyboard editing, paste, history, reduced motion, laptop viewport, and mobile fallback; visible pending/conflict/failure states |
 | X-11 Access and diagnostics | AUTH-01 | Separate tokens, loopback, origin checks | Negative access tests and review of logs, limits, external resources, and launch-token handling |

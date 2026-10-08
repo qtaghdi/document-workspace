@@ -75,6 +75,84 @@ func TestReadRangeIncludesFormula(t *testing.T) {
 	if got.Rows[0][0].Formula != "1+2" {
 		t.Fatalf("formula = %q, want 1+2", got.Rows[0][0].Formula)
 	}
+	if got.Rows[0][0].FormulaValueStatus != "unavailable" {
+		t.Fatalf("formula value status = %q, want unavailable", got.Rows[0][0].FormulaValueStatus)
+	}
+	policy := session.Snapshot().FormulaPolicy
+	if policy.Storage != "preserved" || policy.ServerCalculation != "none" || policy.BrowserCalculation != "preview" || policy.NativeRecalculation != "requested_after_formula_affecting_edits" {
+		t.Fatalf("formula policy = %#v", policy)
+	}
+}
+
+func TestFormulaAffectingEditRequestsNativeRecalculation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "book.xlsx")
+	file := excelize.NewFile()
+	if err := file.SetCellValue("Sheet1", "A1", 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.SetCellFormula("Sheet1", "B1", "A1*2"); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+	_ = file.Close()
+
+	session, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := session.Apply(1, "human", []Operation{{Type: "set_cell", Sheet: "Sheet1", Cell: "A1", Value: 2}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := session.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	reopened, err := excelize.OpenFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	formula, err := reopened.GetCellFormula("Sheet1", "B1")
+	if err != nil || formula != "A1*2" {
+		t.Fatalf("formula = %q, error = %v", formula, err)
+	}
+	properties, err := reopened.GetCalcProps()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if properties.FullCalcOnLoad == nil || !*properties.FullCalcOnLoad || properties.CalcOnSave == nil || !*properties.CalcOnSave || properties.ForceFullCalc == nil || !*properties.ForceFullCalc {
+		t.Fatalf("calculation properties = %#v", properties)
+	}
+}
+
+func TestAddingFormulaUpdatesPolicyWarningAndRecalculation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "book.xlsx")
+	file := excelize.NewFile()
+	if err := file.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+	_ = file.Close()
+
+	session, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	updated, err := session.Apply(1, "ai", []Operation{{Type: "set_formula", Sheet: "Sheet1", Cell: "A1", Formula: "1+2"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, warning := range updated.Warnings {
+		if warning.Feature == "formula calculation" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("formula warning missing from %#v", updated.Warnings)
+	}
 }
 
 func TestSnapshotReportsAndGrowsSheetDimensions(t *testing.T) {
@@ -371,7 +449,7 @@ func TestFeatureWarningsDetectBrowserCompatibilityGaps(t *testing.T) {
 	defer session.Close()
 	warnings := session.Snapshot().Warnings
 	wanted := map[string]bool{
-		"charts": false, "images": false, "conditional formatting": false, "data validation": false,
+		"formula calculation": false, "charts": false, "images": false, "conditional formatting": false, "data validation": false,
 	}
 	for _, warning := range warnings {
 		if _, ok := wanted[warning.Feature]; ok {

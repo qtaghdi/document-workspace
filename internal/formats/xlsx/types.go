@@ -7,10 +7,11 @@ import (
 )
 
 type Cell struct {
-	Address string     `json:"address"`
-	Value   string     `json:"value"`
-	Formula string     `json:"formula,omitempty"`
-	Style   *CellStyle `json:"style,omitempty"`
+	Address            string     `json:"address"`
+	Value              string     `json:"value"`
+	Formula            string     `json:"formula,omitempty"`
+	FormulaValueStatus string     `json:"formulaValueStatus,omitempty"`
+	Style              *CellStyle `json:"style,omitempty"`
 }
 
 type CellStyle struct {
@@ -184,6 +185,14 @@ type Snapshot struct {
 	CanUndo         bool              `json:"canUndo"`
 	CanRedo         bool              `json:"canRedo"`
 	Revision        uint64            `json:"revision"`
+	FormulaPolicy   FormulaPolicy     `json:"formulaPolicy"`
+}
+
+type FormulaPolicy struct {
+	Storage             string `json:"storage"`
+	ServerCalculation   string `json:"serverCalculation"`
+	BrowserCalculation  string `json:"browserCalculation"`
+	NativeRecalculation string `json:"nativeRecalculation"`
 }
 
 type FeatureWarning struct {
@@ -213,4 +222,5 @@ type Session struct {
 	undoHistory  [][]byte
 	redoHistory  [][]byte
 	historyStore *historyStore
+	hasFormulas  bool
 }

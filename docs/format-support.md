@@ -58,7 +58,7 @@ work; a visual overlay must never be marketed as removal of underlying content.
 
 | Feature | Current entry points and behavior | Remaining evidence or work |
 | --- | --- | --- |
-| Cells, formulas, ranges, basic formatting | Human editor and AI operations commit supported edits | Formula storage does not establish Excel-equivalent calculation |
+| Cells, formulas, ranges, basic formatting | Human editor and AI operations commit supported edits; structured policy labels cached values and browser previews; native recalculation is requested | Excel-produced fixture and native Excel recalculation evidence remain pending |
 | Row and column insertion or deletion | Human editor and AI operation paths | Expand structural-edit fidelity fixtures |
 | Images | Existing images render; human and AI move, resize, and delete persist | Image insertion |
 | Charts | Selected types render as previews; human and AI move, resize, and delete; AI can update existing titles | Type, series, axes, legend, style, and broader rendering coverage |

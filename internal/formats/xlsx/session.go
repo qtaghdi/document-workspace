@@ -53,7 +53,7 @@ func Open(path string) (*Session, error) {
 		_ = f.Close()
 		return nil, err
 	}
-	warnings, err := inspectFeatureWarnings(abs)
+	warnings, hasFormulas, err := inspectFeatureWarnings(abs)
 	if err != nil {
 		_ = f.Close()
 		return nil, err
@@ -71,6 +71,7 @@ func Open(path string) (*Session, error) {
 		undoHistory:  undoHistory,
 		redoHistory:  redoHistory,
 		historyStore: historyStore,
+		hasFormulas:  hasFormulas,
 	}, nil
 }
 
@@ -207,6 +208,12 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 			return Snapshot{}, dimensionsErr
 		}
 	}
+	formulaWorkbook := s.hasFormulas || introducesFormula(operations)
+	if formulaWorkbook && affectsFormulaResults(operations) {
+		if err := requestNativeRecalculation(s.file); err != nil {
+			return Snapshot{}, err
+		}
+	}
 	nextContent, err := s.serializeLocked()
 	if err != nil {
 		return Snapshot{}, err
@@ -223,6 +230,10 @@ func (s *Session) Apply(baseRevision uint64, actor string, operations []Operatio
 	historyCommitErr := s.historyStore.commit()
 	committed = true
 	s.revision = nextRevision
+	s.hasFormulas = formulaWorkbook
+	if introducesFormula(operations) {
+		s.ensureFormulaWarningLocked()
+	}
 	s.undoHistory = nextUndo
 	s.redoHistory = nextRedo
 	if historyCommitErr != nil {
@@ -419,5 +430,61 @@ func (s *Session) snapshotLocked() Snapshot {
 		CanUndo:         len(s.undoHistory) > 0,
 		CanRedo:         len(s.redoHistory) > 0,
 		Revision:        s.revision,
+		FormulaPolicy: FormulaPolicy{
+			Storage:             "preserved",
+			ServerCalculation:   "none",
+			BrowserCalculation:  "preview",
+			NativeRecalculation: "requested_after_formula_affecting_edits",
+		},
 	}
+}
+
+func introducesFormula(operations []Operation) bool {
+	for _, operation := range operations {
+		if operation.Type == "set_formula" {
+			return true
+		}
+		for _, row := range operation.Cells {
+			for _, cell := range row {
+				if cell.Formula != "" {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func affectsFormulaResults(operations []Operation) bool {
+	for _, operation := range operations {
+		switch operation.Type {
+		case "set_cell", "set_formula", "paste_range", "insert_rows", "delete_rows", "insert_columns", "delete_columns":
+			return true
+		}
+	}
+	return false
+}
+
+func requestNativeRecalculation(file *excelize.File) error {
+	yes := true
+	if err := file.SetCalcProps(&excelize.CalcPropsOptions{
+		FullCalcOnLoad: &yes,
+		CalcOnSave:     &yes,
+		ForceFullCalc:  &yes,
+	}); err != nil {
+		return fmt.Errorf("request native formula recalculation: %w", err)
+	}
+	return nil
+}
+
+func (s *Session) ensureFormulaWarningLocked() {
+	for _, warning := range s.warnings {
+		if warning.Feature == "formula calculation" {
+			return
+		}
+	}
+	s.warnings = append([]FeatureWarning{{
+		Feature: "formula calculation",
+		Message: "formula expressions are stored, but server values are cached or unavailable; browser results are previews until a native spreadsheet application recalculates the workbook",
+	}}, s.warnings...)
 }

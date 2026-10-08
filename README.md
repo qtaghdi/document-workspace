@@ -106,6 +106,7 @@ implementation detail and does not define the product name.
 - [Format support matrix](docs/format-support.md)
 - [XLSX stable release checklist](docs/xlsx-release-checklist.md)
 - [XLSX recovery operations](docs/xlsx-recovery.md)
+- [XLSX formula policy](docs/xlsx-formula-policy.md)
 - [DOCX preservation prototype](docs/docx-preservation-prototype.md)
 - [Product plan](docs/product-plan.md)
 - [Architecture](docs/architecture.md)

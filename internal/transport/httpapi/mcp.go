@@ -191,7 +191,7 @@ func (s *Server) mcpServer() *mcp.Server {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_workbook",
 		Title:       "Get Workbook",
-		Description: "Get the open workbook name, sheets, and current revision before reading or editing it.",
+		Description: "Get the open workbook name, sheets, revision, and formula calculation policy before reading or editing it.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &closedWorld},
 	}, func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, xlsx.Snapshot, error) {
 		return nil, s.session.Snapshot(), nil
@@ -199,7 +199,7 @@ func (s *Server) mcpServer() *mcp.Server {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "read_range",
 		Title:       "Read Range",
-		Description: "Read cell display values and formulas from an A1-style range in the open xlsx.",
+		Description: "Read cell values and formulas from an A1-style range. Formula values are cached source values or unavailable; the server does not calculate formulas.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &closedWorld},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, input readRangeInput) (*mcp.CallToolResult, xlsx.Range, error) {
 		returnValue, err := s.session.ReadRange(input.Sheet, input.Range)
@@ -228,7 +228,7 @@ func (s *Server) mcpServer() *mcp.Server {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "apply_operations",
 		Title:       "Apply Workbook Operations",
-		Description: "Apply validated cell, formula, or rectangular paste edits to the open xlsx. Pass the latest baseRevision to prevent overwriting concurrent edits.",
+		Description: "Apply validated cell, formula, or rectangular paste edits to the open xlsx. Formula expressions are stored and native recalculation is requested; browser results are previews. Pass the latest baseRevision to prevent overwriting concurrent edits.",
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: &destructive, OpenWorldHint: &closedWorld},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, input applyInput) (*mcp.CallToolResult, applyResponse, error) {
 		snapshot, err := s.session.Apply(input.BaseRevision, "ai", input.Operations)

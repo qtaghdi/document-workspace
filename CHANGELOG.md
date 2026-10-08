@@ -9,6 +9,9 @@ and this project intends to follow Semantic Versioning when releases begin.
 
 ### Added
 
+- Added a structured XLSX formula policy that identifies cached or unavailable
+  formula values, treats browser calculations as previews, and requests full
+  native recalculation after formula-affecting edits.
 - Added source hash checks and cooperating writer locks for XLSX edits and
   history restoration, with conflict responses for external changes.
 - Added event sequence checkpoints, replay-gap resync, and slow-subscriber

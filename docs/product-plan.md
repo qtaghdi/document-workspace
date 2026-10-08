@@ -58,7 +58,9 @@ Remaining XLSX release work:
 2. Add a provenance-recorded Microsoft Excel fixture and native reopen evidence.
 3. Certify the claimed Claude and Codex modes, distinguishing embedded UI from
    browser fallback rather than requiring unsupported host capabilities.
-4. Verify and disclose formula storage, cache, and browser-calculation limits.
+4. Complete native Excel evidence for the implemented
+   [formula policy](xlsx-formula-policy.md), including cache and recalculation
+   behavior.
 5. Complete candidate UI, resource-limit, access, and packaging checks.
 
 The [XLSX release checklist](xlsx-release-checklist.md) defines the first stable
@@ -141,7 +143,8 @@ PDF is treated as a fixed-layout document, not a normal source editor.
 
 1. Review the implemented [recovery protections](xlsx-recovery.md) against the
    release candidate, including documented external-writer and crash limits.
-2. Add Excel evidence and close candidate host, formula, UI, and packaging gates.
+2. Add Excel evidence and close candidate host, UI, and packaging gates. Verify
+   the implemented formula policy during native Excel reopening.
 3. Release the verified XLSX subset, then extend object editing separately.
 4. Run the DOCX preservation experiment before selecting its editor or extracting
    a generic document session. The experiment can proceed independently on copies.

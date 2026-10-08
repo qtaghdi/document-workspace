@@ -48,7 +48,14 @@ func (s *Session) ReadRange(sheet, ref string) (Range, error) {
 			if styleErr != nil {
 				return Range{}, styleErr
 			}
-			cells = append(cells, Cell{Address: address, Value: value, Formula: formula, Style: style})
+			formulaValueStatus := ""
+			if formula != "" {
+				formulaValueStatus = "unavailable"
+				if value != "" {
+					formulaValueStatus = "cached"
+				}
+			}
+			cells = append(cells, Cell{Address: address, Value: value, Formula: formula, FormulaValueStatus: formulaValueStatus, Style: style})
 		}
 		rows = append(rows, cells)
 	}

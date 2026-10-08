@@ -178,8 +178,12 @@ source. Images and chart previews can be moved, resized, or deleted. AI
 operations can update existing chart titles. Image insertion and chart type,
 series, axis, legend, and style editing remain pending.
 
-Formula storage and formula calculation are separate capabilities. Workbook
-content is never evaluated as executable source code.
+Formula storage and formula calculation are separate capabilities. The service
+does not calculate formulas. Cached source values are labeled separately from
+unavailable values, while Univer results are browser previews. Formula-affecting
+edits request full native recalculation in the saved XLSX. See the
+[formula policy](xlsx-formula-policy.md). Workbook content is never evaluated as
+executable source code.
 
 ## Realtime Events
 

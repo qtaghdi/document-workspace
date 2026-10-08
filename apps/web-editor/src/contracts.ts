@@ -8,6 +8,14 @@ export interface WorkbookSnapshot {
   canUndo: boolean;
   canRedo: boolean;
   revision: number;
+  formulaPolicy: FormulaPolicy;
+}
+
+export interface FormulaPolicy {
+  storage: 'preserved';
+  serverCalculation: 'none';
+  browserCalculation: 'preview';
+  nativeRecalculation: 'requested_after_formula_affecting_edits';
 }
 
 export interface FeatureWarning {
@@ -25,6 +33,7 @@ export interface WorkbookCell {
   address: string;
   value: string;
   formula?: string;
+  formulaValueStatus?: 'cached' | 'unavailable';
   style?: CellStyle;
 }
 

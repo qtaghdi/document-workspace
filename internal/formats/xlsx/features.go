@@ -13,14 +13,15 @@ const maxFeatureScanBytes = 8 << 20
 // inspectFeatureWarnings detects preserved XLSX features that the browser does
 // not render completely. The warning prevents visual absence from being
 // mistaken for data loss while Excelize continues to preserve the package.
-func inspectFeatureWarnings(path string) ([]FeatureWarning, error) {
+func inspectFeatureWarnings(path string) ([]FeatureWarning, bool, error) {
 	reader, err := zip.OpenReader(path)
 	if err != nil {
-		return nil, fmt.Errorf("inspect workbook features: %w", err)
+		return nil, false, fmt.Errorf("inspect workbook features: %w", err)
 	}
 	defer reader.Close()
 
 	detected := map[string]bool{}
+	hasFormulas := false
 	for _, entry := range reader.File {
 		name := strings.ToLower(entry.Name)
 		switch {
@@ -38,15 +39,15 @@ func inspectFeatureWarnings(path string) ([]FeatureWarning, error) {
 		}
 		file, openErr := entry.Open()
 		if openErr != nil {
-			return nil, fmt.Errorf("inspect workbook feature part %s: %w", entry.Name, openErr)
+			return nil, false, fmt.Errorf("inspect workbook feature part %s: %w", entry.Name, openErr)
 		}
 		content, readErr := io.ReadAll(io.LimitReader(file, maxFeatureScanBytes))
 		closeErr := file.Close()
 		if readErr != nil {
-			return nil, fmt.Errorf("read workbook feature part %s: %w", entry.Name, readErr)
+			return nil, false, fmt.Errorf("read workbook feature part %s: %w", entry.Name, readErr)
 		}
 		if closeErr != nil {
-			return nil, fmt.Errorf("close workbook feature part %s: %w", entry.Name, closeErr)
+			return nil, false, fmt.Errorf("close workbook feature part %s: %w", entry.Name, closeErr)
 		}
 		if bytes.Contains(content, []byte("<conditionalFormatting")) {
 			detected["conditional formatting"] = true
@@ -54,10 +55,15 @@ func inspectFeatureWarnings(path string) ([]FeatureWarning, error) {
 		if bytes.Contains(content, []byte("<dataValidations")) {
 			detected["data validation"] = true
 		}
+		if bytes.Contains(content, []byte("<f>")) || bytes.Contains(content, []byte("<f ")) {
+			hasFormulas = true
+			detected["formula calculation"] = true
+		}
 	}
 
-	features := []string{"charts", "images", "conditional formatting", "data validation", "external links", "macros"}
+	features := []string{"formula calculation", "charts", "images", "conditional formatting", "data validation", "external links", "macros"}
 	messages := map[string]string{
+		"formula calculation":    "formula expressions are stored, but server values are cached or unavailable; browser results are previews until a native spreadsheet application recalculates the workbook",
 		"charts":                 "chart previews can be moved, resized, or deleted, and AI operations can update existing chart titles",
 		"images":                 "images can be moved, resized, or deleted in the browser and are written back to the workbook",
 		"conditional formatting": "conditional formatting is preserved, with common cell, text, rank, color scale, and data bar rules rendered in the browser",
@@ -74,5 +80,5 @@ func inspectFeatureWarnings(path string) ([]FeatureWarning, error) {
 			})
 		}
 	}
-	return warnings, nil
+	return warnings, hasFormulas, nil
 }

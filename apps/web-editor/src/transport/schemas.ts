@@ -34,6 +34,12 @@ export const workbookSnapshotSchema = z.object({
   canUndo: z.boolean(),
   canRedo: z.boolean(),
   revision: z.number().int().nonnegative(),
+  formulaPolicy: z.object({
+    storage: z.literal('preserved'),
+    serverCalculation: z.literal('none'),
+    browserCalculation: z.literal('preview'),
+    nativeRecalculation: z.literal('requested_after_formula_affecting_edits'),
+  }),
 });
 
 export const workbookRangeSchema = z.object({
@@ -43,6 +49,7 @@ export const workbookRangeSchema = z.object({
     address: z.string(),
     value: z.string(),
     formula: z.string().optional(),
+    formulaValueStatus: z.enum(['cached', 'unavailable']).optional(),
     style: cellStyleSchema.optional(),
   }))),
   merges: z.array(z.string()).optional(),
