@@ -100,6 +100,15 @@ and this project intends to follow Semantic Versioning when releases begin.
 
 ### Changed
 
+- Renamed the product and repository architecture to `document-workspace` and
+  repositioned XLSX as the first format adapter for a multi-format document
+  collaboration platform.
+- Reorganized the monorepo into `apps`, `cmd`, `internal/formats`,
+  `internal/transport`, `testdata/xlsx`, and `legacy` boundaries while
+  preserving existing workbook tools, revisions, events, and XLSX persistence.
+- Versioned the XLSX MCP App resource under the document-workspace namespace
+  and renamed the Go module, executable, frontend package, and local
+  architecture skill.
 - Defined the repository as a polyglot monorepo with Go as the authoritative
   workbook and collaboration service.
 - Replaced the planned Univer Pro evaluation with an OSS-only presence and XLSX

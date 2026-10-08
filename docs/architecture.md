@@ -2,276 +2,210 @@
 
 ## System Context
 
-xlsx-viewer connects an MCP client, a workbook service, and an interactive
-spreadsheet UI. The AI and the person operate on the same revisioned workbook
-session.
+document-workspace connects MCP clients, revisioned document sessions, format
+adapters, and interactive browser editors. A person and an AI agent operate on
+the same authoritative document revision.
 
 ```text
-MCP client
-    | open_workbook, get_workbook, read_range, apply_operations
-    v
-Go service
-    | workbook session
-    | validation and revision control
-    | atomic XLSX persistence
-    | ordered edit events
-    v
-Browser spreadsheet UI
+Claude or Codex
+       |
+       | MCP tools and resources
+       v
+Transport layer
+       |
+       v
+Revisioned document session
+       |
+       +----> format adapter ----> durable source document
+       |
+       +----> ordered events ----> browser editor
 ```
 
-## Components
+XLSX is the first production format. The current process still opens one XLSX
+file at startup, and the existing workbook tool contracts remain stable while
+the repository becomes format-oriented.
 
-### MCP Adapter
+## Architectural Principles
 
-The MCP adapter maps goal-oriented tools to workbook domain calls. It does not
-contain workbook mutation logic. Read and write tools are separate so clients
-can distinguish side effects.
+1. Preserve source documents before adding editing convenience.
+2. A format adapter owns parsing, validation, mutation, and persistence.
+3. Transport code translates contracts and never owns format rules.
+4. Browser state is ephemeral. The server session is authoritative.
+5. Every accepted write validates against a base revision and commits once.
+6. Unsupported content must be preserved or reported before a destructive save.
+7. A shared abstraction needs two real consumers. Empty format scaffolding is
+   not architecture.
 
-Current tools:
+## Repository Boundaries
+
+### Executable
+
+`cmd/document-workspace` parses process configuration, opens the selected
+format session, and starts HTTP or stdio transports. It contains no document
+mutation rules.
+
+### Format Adapters
+
+`internal/formats/<format>` owns format-specific behavior. The current
+`internal/formats/xlsx` package owns:
+
+- workbook lifecycle and bounded reads;
+- operation validation and transactional application;
+- revision checks and ordered events;
+- OOXML and Excelize compatibility behavior;
+- same-directory atomic persistence;
+- durable local undo and redo snapshots;
+- image and chart extraction and editing.
+
+The XLSX package does not import HTTP, MCP, or browser packages.
+
+Future adapters will not be forced into spreadsheet operations:
+
+| Format | Primary model | Initial editing contract |
+| --- | --- | --- |
+| XLSX | cells, ranges, sheets, drawings | structured workbook operations |
+| DOCX | blocks, runs, tables, sections | document-tree operations |
+| PPTX | slides, shapes, media | slide and shape operations |
+| HWPX | sections, paragraphs, controls | HWPX package operations |
+| PDF | pages, annotations, forms | inspect, annotate, fill, and regenerate |
+
+Binary HWP requires a separately evaluated conversion or native integration
+path. PDF is a fixed-layout output format, so arbitrary semantic editing is not
+treated as equivalent to editing DOCX or HWPX source.
+
+### Transport Layer
+
+`internal/transport/httpapi` owns HTTP routing, security middleware, SSE, MCP
+tool registration, MCP App resources, and the loopback browser fallback. It
+depends on the active format adapter but does not implement workbook rules.
+
+The current MCP tools are workbook-specific and remain stable:
 
 - `open_workbook`
 - `get_workbook`
 - `read_range`
-- `get_sheet_objects` for the embedded app
+- `get_sheet_objects`
 - `apply_operations`
 - `restore_history`
 - `update_presence`
 
-`open_workbook` advertises the versioned
-`ui://xlsx-viewer/workbook/v1.html` resource using the MCP Apps metadata
-contract. The resource is a self-contained HTML bundle. It uses app-only tools
-for event polling, human operations, and human presence. The ordinary tools
-remain available when a client does not render MCP Apps.
+New format adapters may expose format-specific tools before a proven common
+document contract exists. A future discovery tool can identify the active
+format and its capabilities without weakening typed operation schemas.
 
-The same MCP server supports Streamable HTTP and stdio. HTTP is the default for
-the standalone browser and future hosted deployment. Stdio lets local desktop
-hosts launch the Go binary. In stdio mode, the process also opens an ephemeral
-loopback HTTP listener by default so hosts without MCP App rendering can show
-the standalone UI in their browser panel. Both transports use the same tool
-contracts, instructions, resource, workbook session, and tests.
+The MCP App resource is versioned as
+`ui://document-workspace/xlsx/v1.html`. The same server supports Streamable
+HTTP and stdio. Stdio mode can start an authenticated loopback browser fallback
+with a single-use launch token.
 
-`open_workbook` returns workbook metadata and, when the loopback fallback is
-active, a short-lived `browserUrl`. The URL contains a single-use launch token
-that expires after two minutes. Its first request exchanges the token for the
-HTTP-only browser session cookie and invalidates the launch token. The reusable
-browser credential is never included in MCP tool output. The fallback listener
-accepts loopback addresses only and stops with the stdio session.
+### Browser Editor
 
-### Workbook Domain
+`apps/web-editor` is the current XLSX browser editor. It uses TypeScript, Vite,
+Tailwind CSS, and Univer open-source packages. `SpreadsheetEngine` isolates
+Univer so application orchestration and transports do not depend directly on
+editor-vendor types.
 
-The workbook domain owns:
+`WorkbookController` owns revision state, serialized writes, presence
+throttling, conflicts, and subscription lifecycle. HTTP and MCP App clients
+implement one `WorkbookClient` contract. Zod validates incoming payloads before
+they enter application state.
 
-- Workbook lifecycle.
-- Sheet and range validation.
-- Operation validation.
-- Revision checks.
-- Serialization and atomic replacement.
-- Ordered event publication.
+A future non-spreadsheet editor may be another application or a format surface
+selected by a shared shell. The current code is not renamed to a generic editor
+until that second surface exists.
 
-The package must remain independent of HTTP, MCP, and browser concerns.
-The package is organized by responsibility within that boundary:
+### Compatibility Corpus
 
-- `session.go` owns lifecycle and transactional batch application.
-- `operations.go` owns operation validation and XLSX mutation mapping.
-- `read.go` owns XLSX range, style, and merged-cell reads.
-- `objects.go` owns bounded image extraction and chart preview data.
-- `persistence.go` owns same-directory atomic replacement and reload behavior.
-- `history_store.go` owns durable local undo and redo snapshots.
-- `events.go` owns bounded event retention and subscriber delivery.
-- `types.go` owns the domain and wire contract structs.
+`testdata/<format>` stores public, generated, or provenance-recorded fixtures.
+The XLSX corpus lives in `testdata/xlsx/compatibility`. Tests copy fixtures to a
+temporary directory, inventory unrelated features, edit through `xlsx.Session`,
+save, reopen, and compare preserved features.
 
-### HTTP API
+The corpus currently includes an Excelize-generated workbook and a LibreOffice
+export. A Microsoft Excel-produced fixture remains required before broader
+fidelity claims.
 
-The HTTP API supports the standalone browser UI. It provides workbook metadata,
-range reads, human edit submission, and SSE events. Browser writes require a
-valid session cookie and a same-origin request.
+### Legacy Reference
 
-The adapter keeps routing and server construction in `server.go`, MCP tool and
-resource registration in `mcp.go`, browser handlers and SSE in `browser.go`,
-and authentication plus security headers in `middleware.go`.
+`legacy/xlsx-python` preserves the original Python proof of concept and its
+regression test. It remains until equivalent behavior is fully characterized by
+the Go implementation.
 
-### Browser UI
+## XLSX Session Model
 
-The browser UI is a TypeScript application bundled with Vite. Univer is the
-selected spreadsheet engine for the current validation phase. Application
-styling uses Tailwind CSS, while Univer provides editor-specific styles.
+Each session has a stable ID, current revision, ordered event sequence, active
+subscribers, and an in-memory Excelize file. A write includes the caller's base
+revision. The session validates the entire batch before mutation, persists it
+atomically, advances the revision once, and then publishes ordered events.
 
-`main.ts` only composes dependencies. `WorkbookController` owns revision state,
-serialized writes, presence throttling, and subscription lifecycle. HTTP and
-MCP App transports implement one `WorkbookClient` contract, and all incoming
-payloads are checked with Zod before entering application state. `AppView` owns
-status and presence presentation. Pure A1, command, and workbook mapping code
-is separate from the stateful Univer lifecycle adapter.
+The session retains up to ten revision snapshots. Individual snapshots larger
+than 32 MB are not retained. The `.xlsx-viewer-history` directory name remains
+stable for upgrade compatibility even though the product has been renamed.
 
-All editor-specific behavior is isolated behind `SpreadsheetEngine`. The
-adapter receives workbook snapshots, emits confirmed human cell and sheet
-object edits, and applies committed remote events. This boundary preserves the
-option to replace Univer with ONLYOFFICE or a custom engine without moving
-validation and persistence out of Go.
+Initial worksheet data loads in bounded ranges. The browser requests aligned
+tiles as the viewport moves, while Univer keeps the grid virtualized.
 
-The Go service remains authoritative. Browser focus, draft text, presence, and
-animation are ephemeral. The adapter synchronizes confirmed cell edits,
-rectangular paste, basic formatting, merged cells, row and column structural
-edits, undo and redo reloads, and committed AI edits. AI
-selections are rendered with Univer's OSS range highlight API.
+## XLSX Compatibility
 
-Workbook snapshots include sheet dimensions. The browser divides the initial
-used ranges into requests that stay within the server's range-size limit, then
-maps each range at its original row and column offset. Univer receives the full
-sheet dimensions so its grid remains virtualized even when the source contains
-more rows than the first visible viewport. An initial data budget prevents an
-unbounded workbook from forcing a full import into browser memory. Scroll
-events request aligned 10,000-cell tiles on demand when the viewport moves
-beyond loaded rectangles.
+The browser maps supported validation and conditional-formatting rules to OSS
+Univer APIs. Unsupported advanced rules remain in the XLSX package and produce
+a visible notice when practical.
 
-The session keeps up to ten revision snapshots for server-authoritative undo and
-redo. Individual snapshots larger than 32 MB are not retained. Undo and redo
-restore a complete prior XLSX package, persist it atomically, advance the
-revision, and publish a `workbook.reload` event. A hidden sidecar directory next
-to the workbook stores hash-addressed snapshots and an atomic manifest, so the
-revision and available history survive process restarts. A pending manifest is
-reconciled after an interrupted save. If another program replaces the workbook,
-the content hash mismatch starts a fresh history instead of applying stale
-snapshots.
+PNG, JPEG, and GIF images use Univer drawing support. Supported chart types are
+rendered as SVG previews because native Univer chart editing is not open
+source. Images and chart previews can be moved, resized, or deleted. AI
+operations can update existing chart titles. Image insertion and chart type,
+series, axis, legend, and style editing remain pending.
 
-Workbook snapshots report detected charts, images, conditional formatting,
-data validation, external links, and macros. The browser displays a
-compatibility notice for detected features that it cannot fully render or edit.
-Inline and range-backed lists, literal whole-number, decimal, and date rules,
-and custom-formula validation have OSS Univer mappings. Common numeric, text,
-formula, rank, average, date-period, color-scale, and data-bar conditional
-formatting rules are also mapped. Formula-backed numeric bounds, named-range
-lists, time and text-length validation, icon sets, and some advanced rule
-options remain XLSX-preserved but are not rendered. PNG, JPEG, and GIF images
-use Univer's OSS drawing packages. Supported chart types are extracted as
-bounded series data and rendered as SVG previews because Univer's native chart
-package is not open source. Images and chart previews can be moved, resized, or
-deleted through the common operation contract. Existing chart titles can also
-be changed by an AI operation. Chart type, series, axis, legend, and style
-editing remain XLSX-preserved but are not exposed as direct object controls.
-Unsupported or oversized objects are omitted with a visible notice. This
-distinguishes visual limitations from silent feature loss.
-
-Only Univer open-source packages are allowed. The Go service will provide
-collaboration, presence state, operation ordering, and XLSX persistence. The UI
-will render AI cursors and selections through an OSS adapter or a custom overlay.
-
-The same TypeScript application has two production entries. The standalone
-entry uses code-split same-origin assets and SSE. The MCP App entry is bundled
-as one HTML resource and uses the official postMessage bridge plus bounded
-event polling. Both entries call the same Go workbook domain and operation
-contracts.
-
-The Univer integration registers required plugins explicitly instead of using
-the complete sheets preset. The MCP App build retains English hyphenation data
-and removes unused language dictionaries from Univer's renderer. This keeps the
-self-contained resource near 8.4 MB after adding validation, conditional
-formatting, and drawing support, without changing the standalone browser build
-or loading runtime code from a CDN.
-
-See [`adr/0001-spreadsheet-engine.md`](adr/0001-spreadsheet-engine.md) for the
-engine comparison and decision.
-
-## State Model
-
-Each open workbook has:
-
-- A stable session ID.
-- An authoritative in-memory workbook representation.
-- A monotonically increasing revision.
-- A monotonically increasing event sequence.
-- Zero or more event subscribers.
-
-A write includes the caller's base revision. A mismatch rejects the full write.
-A successful batch advances the revision once.
-
-## Persistence
-
-The service serializes the workbook to a temporary file in the same directory,
-flushes it, closes it, and atomically replaces the original path. Using the same
-directory avoids cross-filesystem rename behavior. Before replacement, it
-writes a pending durable history manifest. After replacement, it atomically
-promotes that manifest. Startup reconciles an interrupted promotion by checking
-the current workbook hash.
-
-Compatibility tests copy committed fixtures from `testdata/compatibility` to a
-temporary directory, inventory unrelated workbook features, apply an edit
-through `workbook.Session`, then reopen and compare the saved package. The first
-fixture is an Excelize-generated baseline covering formulas, styles, merges,
-validation, conditional formatting, drawings, links, names, and comments. The
-corpus also includes a workbook exported by LibreOfficeDev 26.8.0.0.alpha0. A
-Microsoft Excel fixture remains required before making broader fidelity claims.
-
-Hosted storage will preserve immutable workbook versions in object storage and
-keep the active revision pointer in a relational database.
+Formula storage and formula calculation are separate capabilities. Workbook
+content is never evaluated as executable source code.
 
 ## Realtime Events
 
-The initial transport is SSE because the dominant flow is server to browser.
-Events contain a sequence, revision, actor, type, sheet, cell or range, and
-operation-specific data.
+SSE is used for the current server-to-browser event flow. Events include a
+sequence, revision, actor, type, format location, and operation-specific data.
+The service retains a bounded replay window and supports reconnect with
+`Last-Event-ID`.
 
-Initial event types:
-
-- `presence.update`
-- `cell.typing`
-- `cell.commit`
-- `range.commit`
-- `range.format`
-- `range.merge_cells`
-- `range.unmerge_cells`
-- `sheet.insert_rows`
-- `sheet.delete_rows`
-- `sheet.insert_columns`
-- `sheet.delete_columns`
-- `workbook.reload`
-
-Image and chart operations publish `workbook.reload` with the `objects` state
-for remote clients. The local editor already contains the completed drawing
-transform, while another client reloads authoritative object data from the
-saved XLSX package.
-
-The browser may animate `cell.typing`, but persistence occurs at cell or batch
-granularity. The service retains a bounded in-memory event history and replays
-events after the browser's `Last-Event-ID` on reconnect.
+Typing animation and cursor movement are presentation state. Durable writes
+occur at operation or batch granularity, never once per displayed character.
 
 ## Security Boundaries
 
-Workbook files, formulas, sheet names, cell values, MCP inputs, and browser
-inputs are untrusted. The service validates them without evaluating workbook
-content as code.
+Documents, formulas, names, values, MCP inputs, and browser inputs are
+untrusted. Local mode uses separate random browser and MCP credentials, strict
+cookies, same-origin write checks, bounded requests, and loopback-only fallback
+listeners. Stdio stdout remains protocol-only.
 
-Local mode uses separate unguessable browser and MCP tokens plus a strict
-browser session cookie. The credentials separate human UI access from AI tool
-access, but they are not a hosted identity system.
-Hosted mode will replace this with authenticated user sessions and per-workbook
-authorization.
+Hosted mode will require identity, per-document authorization, immutable object
+versions, tenant isolation, audit storage, quotas, and background processing.
 
 ## Deployment Modes
 
 ### Local
 
-- Bind to `127.0.0.1`.
-- Open a user-selected workbook.
-- Serve the browser UI and Streamable HTTP MCP endpoint, or let a desktop host
-  launch the process over stdio with an ephemeral loopback browser fallback.
-- Store changes back to the local file.
+- Open a user-selected document through a supported format adapter.
+- Bind browser and MCP HTTP endpoints to loopback by default.
+- Support stdio launch by desktop MCP hosts.
+- Persist changes to the local source document.
 
 ### Hosted
 
-- Run behind HTTPS.
 - Authenticate users and MCP clients.
-- Use object storage and a relational database.
-- Isolate workbook sessions by user and tenant.
-- Run large conversions in background workers.
+- Authorize every document read and write.
+- Store immutable document versions in object storage.
+- Store identity, metadata, active revisions, and audit records in a relational
+  database.
+- Isolate conversion and large-document work in bounded background jobs.
 
-## Architectural Decisions Pending
+## Decisions Pending
 
-- Remaining advanced validation and conditional formatting mappings, chart
-  type and series editing, image insertion, and additional chart previews.
-- Further production JavaScript startup reductions beyond the current plugin
-  mode and locale pruning.
-- Formula calculation strategy.
-- Hosted audit operation log persistence format.
-- Durable event replay retention policy.
-- OAuth provider and hosted tenancy model.
+- The first shared session interface after a second format adapter exists.
+- DOCX editing engine and round-trip strategy.
+- PPTX canvas and animation preservation strategy.
+- HWPX coverage and binary HWP integration strategy.
+- PDF annotation, form, OCR, and regeneration boundaries.
+- XLSX formula calculation strategy and remaining advanced feature mappings.
+- Hosted tenancy, durable event replay, and audit persistence.
+
+See [ADR 0001](adr/0001-spreadsheet-engine.md) for the XLSX editor decision.

@@ -1,6 +1,6 @@
 ---
 name: xlsx-compatibility-qa
-description: Verify that xlsx-viewer opens, edits, saves, and reopens representative XLSX files without losing unrelated workbook features. Use when changing workbook parsing, mutation, persistence, Excelize, or compatibility warnings.
+description: Verify that the document-workspace XLSX adapter opens, edits, saves, and reopens representative workbooks without losing unrelated features. Use when changing XLSX parsing, mutation, persistence, Excelize, or compatibility warnings.
 ---
 
 # XLSX Compatibility QA
@@ -11,7 +11,7 @@ semantics. Do not use it for isolated UI styling or documentation changes.
 ## Required Inputs
 
 - Read `AGENTS.md`, `docs/architecture.md`, and the affected workbook code.
-- Inspect `testdata/compatibility/README.md` for fixture provenance, covered
+- Inspect `testdata/xlsx/compatibility/README.md` for fixture provenance, covered
   features, and known gaps.
 - Identify which existing fixture and feature assertions exercise the change.
   Add a focused fixture only when the current corpus cannot represent it.
@@ -23,7 +23,7 @@ semantics. Do not use it for isolated UI styling or documentation changes.
 2. Inventory the features relevant to the change before opening a workbook
    session.
 3. Apply an edit to a cell unrelated to the inventoried features through the
-   real `workbook.Session` boundary.
+   real `xlsx.Session` boundary.
 4. Close and reopen the saved XLSX package.
 5. Compare formulas, styles, merged ranges, validation, conditional formatting,
    drawings, links, names, comments, and other relevant package parts.

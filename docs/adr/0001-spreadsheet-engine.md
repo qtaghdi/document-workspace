@@ -5,7 +5,7 @@
 
 ## Context
 
-xlsx-viewer needs an Excel-like spreadsheet surface that can run inside an MCP
+document-workspace needs an Excel-like spreadsheet surface that can run inside an MCP
 App, support direct human editing, and make AI activity visible as cursor,
 selection, typing, and committed changes. The UI must also remain usable through
 MCP tools when a host does not render an embedded application.

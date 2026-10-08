@@ -2,9 +2,10 @@
 
 ## Repository Model
 
-xlsx-viewer is a polyglot monorepo. Go owns workbook state, persistence,
-revision control, realtime events, and MCP tools. TypeScript owns the browser
-interaction layer. Both sides must change together when a contract changes.
+document-workspace is a polyglot monorepo. Go owns format sessions,
+persistence, revision control, realtime events, and MCP tools. TypeScript owns
+browser interaction surfaces. A format contract change must be coordinated
+across every affected boundary.
 
 Univer open-source packages are allowed. Univer Pro packages and services are
 not allowed unless the repository owner approves a new architecture decision.
@@ -36,7 +37,7 @@ Use Conventional Commits with an English imperative subject:
 <type>(<scope>): <summary>
 ```
 
-Recommended scopes include `go`, `web`, `mcp`, `workbook`, `realtime`, `docs`,
+Recommended scopes include `go`, `web`, `mcp`, `xlsx`, `realtime`, `docs`,
 `build`, and `deps`.
 
 Examples:
@@ -94,7 +95,7 @@ make audit
 - Call out XLSX compatibility, revision, security, and MCP contract impact.
 - Update `CHANGELOG.md` for material changes.
 - Update architecture documents when a system boundary changes.
-- Do not commit generated files under `internal/httpapi/static/assets`.
+- Do not commit generated files under `internal/transport/httpapi/static/assets`.
 - Use `make build` for release binaries so the frontend is generated before the
   Go binary embeds it.
 - Keep unrelated cleanup out of the pull request.

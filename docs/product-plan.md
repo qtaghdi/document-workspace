@@ -1,145 +1,138 @@
 # Product Plan
 
-## Context
+## Vision
 
-xlsx-viewer will be an AI-collaborative spreadsheet workspace for MCP clients.
-A person can edit cells directly while an AI agent reads and changes the same
-workbook. The UI will show the AI's cursor, selection, typing, formatting, and
-commit progress.
+document-workspace is an AI-collaborative workspace for office documents in
+Claude, Codex, and other MCP clients. A person and an AI agent work against one
+revisioned document session with visible activity, explicit commits, conflicts,
+undo, and format-aware persistence.
 
-The Python proof of concept established the basic interaction. The Go service is
-the foundation for safe persistence, revision control, realtime events, MCP
-tools, authentication, and production deployment.
+The product targets useful, safe interoperability rather than claiming that
+one editor can reproduce every proprietary desktop feature. Compatibility is
+measured separately for source preservation, rendering, and editing.
 
 ## Product Principles
 
-1. A revisioned workbook session is authoritative during editing.
-2. XLSX is a durable import and export format.
-3. AI edits are validated operations, not arbitrary code execution.
-4. The UI visualizes AI work without saving once per character.
-5. MCP tools remain useful without an embedded UI.
-6. Workbook fidelity is measured with a representative compatibility corpus.
+1. Preserve the user's source document before adding convenience.
+2. Give every format its own typed operations and compatibility contract.
+3. Keep revision, approval, history, and presence behavior consistent.
+4. Show unsupported or potentially lossy features before saving.
+5. Keep MCP tools useful when an embedded UI is unavailable.
+6. Verify fidelity with provenance-recorded compatibility corpora.
+7. Do not execute macros, formulas, or embedded content as code.
 
-## Phase 1: Safe Go Foundation
+## Compatibility Levels
 
-Status: complete for local single-workbook mode.
+Each format reports progress against three independent levels:
 
-- Open one XLSX workbook as a session.
-- Expose workbook metadata and range reads.
-- Apply validated cell and formula operations.
-- Reject writes based on stale revisions.
-- Persist through a temporary file and atomic replacement.
-- Expose Streamable HTTP MCP tools.
-- Publish ordered edit events through SSE.
-- Protect local browser and MCP access with separate tokens.
+1. Preservation: unsupported content survives an unrelated save.
+2. Rendering: people can inspect the document with useful visual fidelity.
+3. Editing: supported changes can be saved back to the source format.
+
+Passing one level does not imply the next level.
+
+## Phase 1: XLSX Production Adapter
+
+Status: in progress and usable for local workbook collaboration.
+
+Completed foundations include:
+
+- Go workbook sessions with revisions and atomic saves;
+- Streamable HTTP and stdio MCP transports;
+- an embedded MCP App and loopback browser fallback;
+- direct human edits and ordered AI events;
+- range paste, styles, merges, row and column operations;
+- durable bounded undo and redo;
+- large-sheet viewport loading;
+- validation and conditional-format rendering for common rules;
+- image and chart preview movement, resize, deletion, and write-back;
+- generated and LibreOffice compatibility fixtures.
+
+Remaining XLSX release work:
+
+1. Add a provenance-recorded Microsoft Excel fixture.
+2. Add image insertion.
+3. Add chart type, series, axis, legend, and style editing where fidelity can be
+   verified without proprietary dependencies.
+4. Complete live Claude and Codex embedded-host certification.
+5. Decide formula calculation scope.
+6. Expand advanced validation, conditional formatting, and object coverage.
+
+The initial XLSX release does not promise macro execution, encrypted workbook
+editing, a complete Excel formula engine, or preservation of every proprietary
+extension.
+
+## Phase 2: Shared Document Platform
+
+Status: repository boundaries established, shared runtime extraction pending a
+second adapter.
+
+- Keep formats under `internal/formats/<format>`.
+- Keep HTTP, MCP, authentication, and UI delivery under `internal/transport`.
+- Define capability discovery for active format sessions.
+- Extract common revision, history, approval, and event contracts only after a
+  second adapter validates the model.
+- Add document-level audit records and immutable version metadata.
+- Introduce a browser shell only when two format surfaces exist.
 
 Exit criteria:
 
-- Unit, race, vet, API smoke, MCP handshake, and XLSX reopen checks pass.
-- Malformed operations do not partially modify the workbook.
-- The browser reflects AI edit events.
+- XLSX behavior remains unchanged through the new repository boundaries.
+- A second adapter reuses real session infrastructure without spreadsheet-only
+  concepts leaking into its operation model.
+- Format capabilities are discoverable and validated at transport boundaries.
 
-## Phase 2: Spreadsheet Editing Experience
+## Phase 3: DOCX Adapter
 
-Status: in progress. Range paste, basic styles, merged cells, presence, and
-reconnect replay are implemented. The first generated XLSX compatibility corpus
-fixture is covered by an automated unrelated-edit round-trip test. Initial
-worksheet data now loads in bounded chunks using server-reported sheet
-dimensions, then loads aligned tiles as the user scrolls. Row and column
-operations, durable bounded server-authoritative undo and redo, unsupported
-feature notices, and a LibreOffice-produced compatibility fixture are
-implemented. Images and chart previews can be moved, resized, and deleted with
-XLSX write-back, and AI operations can update existing chart titles. Image
-insertion, full chart definition editing, and a Microsoft Excel fixture remain.
+- Inventory paragraphs, runs, tables, sections, comments, headers, footers, and
+  embedded media.
+- Provide structured text and table operations.
+- Preserve unsupported OOXML parts during unrelated edits.
+- Select an OSS browser editor or a constrained custom surface after a fidelity
+  prototype.
+- Build Word and LibreOffice provenance fixtures.
 
-- Integrate Univer behind a replaceable `SpreadsheetEngine` boundary.
-- Bundle the TypeScript application with Vite and style the application shell
-  with Tailwind CSS.
-- Use only Univer open-source packages.
-- Implement AI presence and remote selections through the Go realtime layer and
-  an OSS UI overlay.
-- Extend the Excelize snapshot adapter for styles, merges, validations, and
-  other workbook features.
-- Add cell and range selection.
-- Add keyboard navigation.
-- Add multi-cell copy and paste.
-- Add a formula bar.
-- Add row and column operations. Complete.
-- Add undo and redo backed by bounded revision history. Complete for the local
-  session, including restart recovery and external replacement detection.
-- Add distinct pending, committed, conflicted, and failed states.
-- Add accessible AI cursor and typing animation.
+DOCX is the recommended second adapter because it tests the shared session
+model without requiring fixed-layout reconstruction.
 
-Exit criteria:
+## Phase 4: PPTX Adapter
 
-- The primary editing workflow works without a mouse.
-- Large sheets do not require rendering every cell.
-- Human and AI edits produce deterministic conflict behavior.
+- Model slides, shapes, text, images, charts, notes, and ordering.
+- Provide a slide canvas with explicit object operations.
+- Preserve themes, masters, transitions, and unsupported animation metadata.
+- Build PowerPoint and LibreOffice provenance fixtures.
 
-## Phase 3: MCP App Packaging
+## Phase 5: HWPX and HWP
 
-Status: in progress. The resource, tool metadata, dual transport adapter,
-protocol integration tests, local stdio transport, and first bundle reduction
-are implemented. Live host UI certification remains.
+- Implement HWPX package inspection and structured editing first.
+- Build fixtures with known Hancom Office provenance.
+- Evaluate binary HWP conversion or native integration separately.
+- Never imply binary HWP round-trip support from HWPX support.
 
-- Register an MCP App UI resource. Complete.
-- Associate UI metadata only with tools that need the spreadsheet surface.
-  Complete.
-- Use the official MCP App postMessage bridge inside an embedded host. Complete.
-- Keep ordinary workbook tools available when UI is unavailable. Complete.
-- Serve an authenticated loopback browser fallback from stdio sessions and
-  return a single-use launch URL from `open_workbook`. Complete.
-- Reduce the self-contained Univer bundle before broad host certification.
-  Complete for the initial target, from 12.7 MB to approximately 7.8 MB.
-  Validation, conditional formatting, and drawing support currently bring it
-  to about 8.4 MB before transport compression.
-- Verify Claude Desktop and Codex host behavior and document any capability
-  differences. Claude Desktop Code and Codex stdio tools, approved writes,
-  conflicts, and XLSX reopening are certified. The Codex loopback browser
-  fallback is also certified for launch, rendering, human writes, AI presence,
-  AI commits, and XLSX reopening. Embedded UI remains pending in both tested
-  host paths.
-- Show partial tool input as uncommitted ghost text only when the host supports
-  it.
+## Phase 6: PDF Workflows
 
-## Phase 4: Hosted Service
+PDF is treated as a fixed-layout document, not a normal source editor.
+
+- Inspect text, images, pages, outlines, metadata, annotations, and forms.
+- Support annotation, form filling, page organization, redaction workflows, and
+  export verification.
+- Add OCR as an explicit derived-content workflow.
+- Regenerate a new PDF for semantic edits and retain the original source.
+
+## Phase 7: Hosted Service
 
 - Add OAuth or OIDC identity.
-- Authorize workbook ownership on every request and tool call.
-- Store workbook versions in object storage.
-- Store identity, metadata, and revisions in a relational database.
-- Move large imports and exports to background jobs.
-- Add request tracing, metrics, audit events, and recovery workflows.
-- Add quotas for workbook size, operation count, and active sessions.
-
-## Out of Scope for the Initial Release
-
-- A complete Excel-compatible formula engine.
-- Google Sheets scale multi-user CRDT collaboration.
-- Macro execution.
-- Editing encrypted workbooks.
-- A guarantee that every proprietary Excel extension is preserved.
-
-## Milestones
-
-| Milestone | Scope | Estimate |
-| --- | --- | --- |
-| M1 | Go backend, MCP tools, atomic saves, revisions, SSE | 3 to 5 days |
-| M2 | Production grid, selection, paste, AI presence | 1 to 2 weeks |
-| M3 | MCP App packaging and host compatibility | 3 to 5 days |
-| M4 | Identity, durable storage, deployment, operations | 1 to 2 weeks |
+- Authorize document ownership on every request and tool call.
+- Store immutable document versions in object storage.
+- Store identity, metadata, revisions, and audit records in a relational
+  database.
+- Add bounded conversion workers, tracing, metrics, quotas, and recovery.
 
 ## Immediate Next Work
 
-1. Add a provenance-recorded Microsoft Excel fixture to the XLSX compatibility
-   corpus. LibreOffice coverage is complete.
-2. Add image insertion and chart type, series, axis, legend, and style editing.
-   Existing images and chart previews already support placement, resize, and
-   deletion write-back, and existing chart titles can be changed by AI tools.
-   Named-range lists, formula-backed bounds, icon sets, and other advanced
-   workbook rules remain future compatibility work.
-3. Certify the loopback browser fallback and browser-originated edits in the
-   current Claude Desktop browser panel. Native embedded MCP App rendering
-   remains pending in both hosts.
-4. Continue measuring startup cost and remove additional plugins only when the
-   editing workflow remains intact.
+1. Verify this repository migration without changing XLSX behavior.
+2. Finish the remaining XLSX object editing work.
+3. Add the Microsoft Excel compatibility fixture and final desktop-host checks.
+4. Release the XLSX adapter as the first stable document-workspace capability.
+5. Prototype DOCX preservation and operation boundaries before extracting a
+   generic document session.

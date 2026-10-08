@@ -1,4 +1,4 @@
-module github.com/qtaghdi/xlsx-viewer
+module github.com/qtaghdi/document-workspace
 
 go 1.25.0
 

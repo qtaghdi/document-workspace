@@ -116,7 +116,7 @@ References:
 make build
 ```
 
-The binary is written to `bin/xlsx-viewer`. Use absolute paths in host
+The binary is written to `bin/document-workspace`. Use absolute paths in host
 configuration because desktop applications do not inherit the shell working
 directory.
 
@@ -128,8 +128,8 @@ with absolute paths on the current machine.
 ```json
 {
   "mcpServers": {
-    "xlsx-viewer": {
-      "command": "/absolute/path/to/xlsx-viewer/bin/xlsx-viewer",
+    "document-workspace": {
+      "command": "/absolute/path/to/document-workspace/bin/document-workspace",
       "args": [
         "-transport",
         "stdio",
@@ -152,8 +152,8 @@ Add the following to the applicable Codex `config.toml`. Replace both paths
 with absolute paths.
 
 ```toml
-[mcp_servers.xlsx_viewer]
-command = "/absolute/path/to/xlsx-viewer/bin/xlsx-viewer"
+[mcp_servers.document_workspace]
+command = "/absolute/path/to/document-workspace/bin/document-workspace"
 args = ["-transport", "stdio", "-file", "/absolute/path/to/workbook.xlsx"]
 ```
 
@@ -185,7 +185,7 @@ instead of reusing an older approved write.
 
 Use a disposable copy of a representative workbook.
 
-1. Start a new host conversation with only `xlsx-viewer` enabled.
+1. Start a new host conversation with only `document-workspace` enabled.
 2. Confirm that initialization succeeds and server instructions are visible to
    the client.
 3. Call `get_workbook` and `read_range` without opening the UI.

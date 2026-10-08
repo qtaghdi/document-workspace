@@ -80,7 +80,7 @@ importers:
 
   .: {}
 
-  web:
+  apps/web-editor:
     dependencies:
       '@modelcontextprotocol/client':
         specifier: ^2.2.0

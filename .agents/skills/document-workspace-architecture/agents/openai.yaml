@@ -1,0 +1,3 @@
+interface:
+  display_name: "Document Workspace Architecture"
+  short_description: "Safely evolve format, service, MCP, realtime, and editor boundaries"

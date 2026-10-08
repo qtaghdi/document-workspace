@@ -1,4 +1,4 @@
-# xlsx-viewer Engineering Guide
+# document-workspace Engineering Guide
 
 This file is the repository-level source of truth for agents and contributors.
 It applies to the entire repository unless a more specific `AGENTS.md` exists in
@@ -6,23 +6,23 @@ a subdirectory.
 
 ## Product Mission
 
-xlsx-viewer is an AI-collaborative spreadsheet workspace for MCP clients. A
-person and an AI agent can inspect and edit the same workbook while the UI shows
-the AI's cursor, selection, typing, formatting, and commit progress.
+document-workspace is an AI-collaborative workspace for office documents. A
+person and an AI agent can inspect and edit the same document while the UI shows
+the AI's presence, changes, and commit progress.
 
-The product is not only an XLSX converter. During an editing session, the source
-of truth is a revisioned workbook session and its operation log. XLSX is the
-durable import and export format.
+The product is organized around revisioned document sessions and format
+adapters. XLSX is the first production adapter. DOCX, PPTX, HWPX, and PDF are
+planned adapters with different editing semantics and fidelity requirements.
 
 ## Architecture
 
-The system has four boundaries:
+The system has five boundaries:
 
-1. The MCP boundary exposes goal-oriented workbook tools to AI clients.
-2. The workbook domain owns validation, revisions, atomic persistence, and
-   compatibility behavior.
-3. The realtime boundary publishes edit events to connected UIs.
-4. The browser UI renders the workbook and lets people edit it directly.
+1. The MCP boundary exposes goal-oriented document tools to AI clients.
+2. Each format adapter owns parsing, validation, persistence, and compatibility.
+3. The session boundary owns revisions and ordered operations.
+4. The realtime boundary publishes edit events to connected UIs.
+5. Browser editors render a format-specific surface for human edits.
 
 The current implementation is a single Go process:
 
@@ -31,9 +31,9 @@ MCP client
     | Streamable HTTP tools
     v
 Go service
-    | workbook session, revision, operation log
-    | atomic XLSX persistence
-    +----------> SSE edit events ----------> Browser spreadsheet UI
+    | format session, revision, operation log
+    | format-specific persistence
+    +----------> edit events ----------> Browser editor
 ```
 
 The server owns authoritative workbook data. UI state such as focus, selection,
@@ -41,7 +41,8 @@ open panels, and in-progress animation remains ephemeral in the browser.
 
 This repository is a polyglot monorepo. Keep the Go service, TypeScript UI,
 tests, and architecture documents versioned and verified together. Vite output
-under `internal/httpapi/static/assets` is generated locally and is not tracked.
+under `internal/transport/httpapi/static/assets` is generated locally and is
+not tracked.
 Do not split the source into separate repositories without a deployment or
 ownership requirement.
 
@@ -52,7 +53,7 @@ boundary or adding infrastructure.
 
 - Go 1.25 or newer for the service.
 - Official MCP Go SDK for MCP transports and tool contracts.
-- Excelize for XLSX package access.
+- Excelize for the current XLSX adapter.
 - `net/http` for the current HTTP API and SSE transport.
 - TypeScript with Univer for the spreadsheet surface. Keep Univer behind the
   repository's `SpreadsheetEngine` boundary.
@@ -64,9 +65,9 @@ boundary or adding infrastructure.
   keep all Univer packages on one exact version. Do not add npm or Bun lockfiles.
 - SSE for server-to-UI edit events. Add WebSocket only when bidirectional
   presence or latency requirements justify the operational cost.
-- A relational database for identities, workbook metadata, and revision
+- A relational database for identities, document metadata, and revision
   metadata when hosted persistence is introduced.
-- Object storage for uploaded workbook versions when hosted persistence is
+- Object storage for uploaded document versions when hosted persistence is
   introduced.
 
 Do not introduce an additional framework, datastore, queue, or transport without
@@ -74,15 +75,18 @@ a concrete requirement and a short architecture note.
 
 ## Repository Layout
 
-- `cmd/xlsx-viewer`: executable entry point.
-- `internal/workbook`: workbook domain and persistence.
-- `internal/httpapi`: HTTP, SSE, browser UI, and MCP adapters.
-- `web`: TypeScript spreadsheet UI and engine adapters.
+- `cmd/document-workspace`: executable entry point.
+- `internal/formats/xlsx`: first format adapter, workbook domain, and persistence.
+- `internal/transport/httpapi`: HTTP, SSE, MCP, and embedded UI adapters.
+- `apps/web-editor`: current TypeScript spreadsheet editor and engine adapter.
+- `testdata/xlsx`: XLSX compatibility fixtures and provenance.
+- `legacy/xlsx-python`: preserved Python MVP and regression reference.
 - `docs`: English Markdown architecture and product documents.
-- `server.py`, `test_server.py`: preserved Python MVP and regression reference.
 
-Keep domain logic out of HTTP handlers and UI code. Transport-specific types may
-depend on domain types. The workbook domain must not depend on HTTP or MCP.
+Keep format logic out of HTTP handlers and UI code. Transport packages may
+depend on format adapters. Format adapters must not depend on HTTP, MCP, or a
+browser editor. Add a shared document abstraction only when at least two real
+format adapters require it.
 
 ## Design Principles
 
@@ -97,10 +101,11 @@ depend on domain types. The workbook domain must not depend on HTTP or MCP.
 9. Prefer coherent batch operations over one tool call per cell.
 10. Design for graceful fallback when a host lacks optional capabilities.
 
-## Workbook Compatibility
+## Document Compatibility
 
-XLSX round-trip fidelity is a product requirement. Every workbook engine change
-must be checked against representative files that cover formulas, styles,
+Round-trip fidelity is a product requirement for editable source formats. Every
+XLSX adapter change must be checked against representative files that cover
+formulas, styles,
 merged cells, validation, conditional formatting, charts, images, external
 links, and large sheets.
 
@@ -228,8 +233,8 @@ follow this guide and record durable decisions in `docs` instead.
 
 Current repository skills include:
 
-- `xlsx-viewer-architecture` for changes spanning Go, MCP, realtime, and the
-  browser spreadsheet boundary.
+- `document-workspace-architecture` for changes spanning format adapters, Go,
+  MCP, realtime, and browser editor boundaries.
 - `xlsx-compatibility-qa` for workbook corpus verification.
 
 Likely future skills include:
@@ -248,7 +253,7 @@ and expected outputs.
   `<type>(<scope>): <summary>`.
 - Allowed commit types are `feat`, `fix`, `docs`, `refactor`, `test`, `build`,
   `ci`, `chore`, `perf`, `revert`, and `security`.
-- Prefer scopes such as `go`, `web`, `mcp`, `workbook`, `realtime`, `docs`,
+- Prefer scopes such as `go`, `web`, `mcp`, `xlsx`, `realtime`, `docs`,
   `build`, and `deps`. Omit the scope only when a change truly spans the whole
   repository.
 - Use lowercase branch names in the form `<type>/<short-description>`, such as
@@ -258,7 +263,7 @@ and expected outputs.
 - Use the repository issue and pull request templates. Pull request titles must
   follow the same Conventional Commits format.
 - Make focused commits. Do not commit generated frontend assets under
-  `internal/httpapi/static/assets`.
+  `internal/transport/httpapi/static/assets`.
 - Do not combine unrelated formatting or cleanup with a feature change.
 - Do not rewrite shared history unless the repository owner explicitly asks.
 - Update documentation and the changelog in the same commit as the behavior.

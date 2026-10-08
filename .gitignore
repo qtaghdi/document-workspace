@@ -1,9 +1,9 @@
 # Frontend dependencies and local caches
 node_modules/
 .pnpm-store/
-web/.vite/
-internal/httpapi/static/assets/
-internal/httpapi/static/app.html
+apps/web-editor/.vite/
+internal/transport/httpapi/static/assets/
+internal/transport/httpapi/static/app.html
 
 # Local configuration and secrets
 .env
@@ -20,7 +20,7 @@ internal/httpapi/static/app.html
 !testdata/**/*.xlsb
 
 # Go build and test outputs
-/xlsx-viewer
+/document-workspace
 /bin/
 /dist/
 *.test

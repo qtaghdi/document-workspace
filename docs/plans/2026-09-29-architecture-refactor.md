@@ -9,20 +9,20 @@ UI behavior.
 
 ## Current State
 
-- `web/src/main.ts` owns startup, revision state, write serialization,
+- `apps/web-editor/src/main.ts` owns startup, revision state, write serialization,
   subscriptions, presence throttling, and status rendering.
-- `web/src/api.ts` branches between HTTP and MCP App transport inside one class.
-- `web/src/univer-engine.ts` owns Univer construction, event translation,
+- `apps/web-editor/src/api.ts` branches between HTTP and MCP App transport inside one class.
+- `apps/web-editor/src/univer-engine.ts` owns Univer construction, event translation,
   remote-event application, A1 helpers, and workbook mapping.
-- `internal/httpapi/server.go` combines MCP registration, browser handlers,
+- `internal/transport/httpapi/server.go` combines MCP registration, browser handlers,
   middleware, SSE, and response helpers.
-- `internal/workbook/session.go` combines domain types, session lifecycle,
+- `internal/formats/xlsx/session.go` combines domain types, session lifecycle,
   reads, operation validation and application, styles, events, ranges, and
   persistence.
 
 ## Scope
 
-- Add and apply the repository-local `xlsx-viewer-architecture` skill.
+- Add and apply the repository-local `document-workspace-architecture` skill.
 - Split TypeScript orchestration, transport, UI status, spreadsheet mapping,
   and Univer-specific behavior into focused modules.
 - Replace optional-field operation types with discriminated unions.
@@ -68,7 +68,7 @@ main.ts
 
 Go CLI
   -> HTTP or stdio adapter
-      -> workbook.Session
+      -> xlsx.Session
           -> validation and operations
           -> XLSX reads and persistence
           -> ordered event stream
@@ -107,7 +107,7 @@ Go CLI
 
 Completed on 2026-09-29.
 
-- Added and validated the repository-local `xlsx-viewer-architecture` skill.
+- Added and validated the repository-local `document-workspace-architecture` skill.
 - Introduced `WorkbookController`, `WorkbookClient`, separate HTTP and MCP App
   transports, `AppView`, Zod boundary schemas, and strict operation and event
   unions.
