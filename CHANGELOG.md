@@ -9,6 +9,11 @@ and this project intends to follow Semantic Versioning when releases begin.
 
 ### Added
 
+- Added a shared product specification covering document lifecycle, revisioned
+  collaboration, host permissions, proposed review, persistence, and recovery.
+- Added a format support matrix separating current XLSX capabilities from
+  planned DOCX, PPTX, HWPX, PDF, and binary HWP research, with conversion scope,
+  compatibility evidence, and release gates.
 - Added a Univer-powered spreadsheet UI behind a replaceable engine interface.
 - Added Vite and Tailwind CSS build tooling without adding a React application
   dependency.

@@ -2,6 +2,10 @@
 
 ## System Context
 
+The [shared product specification](product-spec.md) defines target behavior;
+the [format support matrix](format-support.md) separates current capabilities
+from planned adapters and their release evidence.
+
 document-workspace connects MCP clients, revisioned document sessions, format
 adapters, and interactive browser editors. A person and an AI agent operate on
 the same authoritative document revision.

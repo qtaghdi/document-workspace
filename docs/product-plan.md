@@ -23,6 +23,10 @@ measured separately for source preservation, rendering, and editing.
 
 ## Compatibility Levels
 
+See the [shared product specification](product-spec.md) for lifecycle and
+collaboration requirements and the [format support matrix](format-support.md)
+for current capabilities, target scope, and evidence gates.
+
 Each format reports progress against three independent levels:
 
 1. Preservation: unsupported content survives an unrelated save.
@@ -130,7 +134,9 @@ PDF is treated as a fixed-layout document, not a normal source editor.
 
 ## Immediate Next Work
 
-1. Verify this repository migration without changing XLSX behavior.
+1. Detail the XLSX stable-release checklist and DOCX preservation prototype
+   using the shared specification and format matrix. Repository migration and
+   its regression verification are complete.
 2. Finish the remaining XLSX object editing work.
 3. Add the Microsoft Excel compatibility fixture and final desktop-host checks.
 4. Release the XLSX adapter as the first stable document-workspace capability.

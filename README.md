@@ -102,6 +102,8 @@ implementation detail and does not define the product name.
 
 ## Documentation
 
+- [Shared product specification](docs/product-spec.md)
+- [Format support matrix](docs/format-support.md)
 - [Product plan](docs/product-plan.md)
 - [Architecture](docs/architecture.md)
 - [Host compatibility](docs/host-compatibility.md)
